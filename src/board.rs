@@ -1,5 +1,4 @@
-
-use std::char::ToUppercase;
+use core::panic;
 use std::fmt;
 use std::collections::HashMap;
 use crate::piece::Piece;
@@ -10,8 +9,10 @@ use crate::offset_square;
 use crate::get_rank;
 use crate::get_file;
 use position_key::PositionKey;
+use undo::Undo;
 
 mod position_key;
+mod undo;
 #[derive(Clone)]
 pub struct Board {
     pub pieces: [Piece; 64], 
@@ -21,7 +22,7 @@ pub struct Board {
     pub white_king_castling_possible: bool,
     pub black_queen_castling_possible: bool,
     pub black_king_castling_possible: bool,
-    pub position_history: HashMap<PositionKey, u8>,
+    pub move_history: Vec<Move>,
 
 }
 
@@ -44,8 +45,17 @@ impl fmt::Display for Board {
 }
 
 impl Board {
-    pub fn execute_move(&mut self, m: &Move){
+    pub fn make_move(&mut self, m: &Move) -> Undo{
         //TODO
+        let undo = Undo {
+            captured_piece: self.pieces[m.to as usize],
+            old_black_king_castling_possible: self.black_king_castling_possible,
+            old_black_queen_castling_possible: self.black_queen_castling_possible,
+            old_white_king_castling_possible: self.white_king_castling_possible,
+            old_white_queen_castling_possible: self.white_queen_castling_possible,
+            old_last_move: self.last_move,
+        };
+
         let piece = self.pieces[m.from as usize];
         if m.move_type == MoveType::Normal || m.move_type == MoveType::PawnDoubleStep{
             self.pieces[m.to as usize] = piece;
@@ -70,20 +80,65 @@ impl Board {
         }
         self.last_move = *m;
         self.white_to_move = self.white_to_move.invert();
-        self.set_castling_rights(m);        
+        self.set_castling_rights(m); 
+        //testing if omission of threefold repetition will speed up       
         let key = self.position_key();
-        *self.position_history.entry(key).or_insert(0) += 1;
-        if self.is_threefold_repetition() {
-            eprintln!("Draw by threefold repetition!");
+        self.move_history.push(*m);
+        //if self.is_threefold_repetition() {
+            //eprintln!("Draw by threefold repetition!");
+        //}
+        undo
+
+    }
+    
+    pub fn unmake_move(&mut self, m: &Move, undo: Undo) {
+        self.black_king_castling_possible = undo.old_black_king_castling_possible;
+        self.black_queen_castling_possible = undo.old_black_queen_castling_possible;
+        self.white_king_castling_possible = undo.old_white_king_castling_possible;
+        self.white_queen_castling_possible = undo.old_white_queen_castling_possible;
+        self.last_move = undo.old_last_move;
+        self.white_to_move = self.white_to_move.invert(); // at the end of the done move, we gave over control to the other player
+        let from = m.from as usize;
+        let to = m.to as usize;
+        match m.move_type {
+            MoveType::Normal | MoveType::PawnDoubleStep => {
+                self.pieces[from] = self.pieces[to];
+                self.pieces[to] = undo.captured_piece;
+            }
+            MoveType::Promotion(_) => {
+                self.pieces[from] = self.white_to_move.pawn();
+                self.pieces[to] = undo.captured_piece;
+            } 
+            MoveType::EnPassant => {
+                self.pieces[from] = self.pieces[to];
+                self.pieces[to] = Piece::Empty;
+                //match color
+                match self.white_to_move {
+                    Color::White => self.pieces[to-8] = self.white_to_move.pawn(),
+                    Color::Black => self.pieces[to+8] = self.white_to_move.pawn(),
+                }
+            }
+            MoveType::CastleKingside => {
+                self.pieces[from] = self.pieces[to];
+                self.pieces[to] = Piece::Empty;
+                self.pieces[to+1] = self.pieces[from+1];
+                self.pieces[from+1] = Piece::Empty;
+            }
+            MoveType::CastleQueenside => {
+                self.pieces[from] = self.pieces[to];
+                self.pieces[to] = Piece::Empty;
+                self.pieces[from -4] = self.pieces[from -1];
+                self.pieces[from -1] = Piece::Empty;
+            }
         }
-
+        self.move_history.pop();
     }
 
-    pub fn is_threefold_repetition(&self) -> bool {
-        self.position_history
-            .get(&self.position_key())
-            .is_some_and(|&count| count >= 3)
-    }
+    // pub fn is_threefold_repetition(&self) -> bool {
+    //     self.position_history
+    //         .get(&self.position_key())
+    //         .is_some_and(|&count| count >= 3)
+    // }
 
     pub fn generate_possible_moves(&self) -> Vec<Move> {
         let mut possible_moves:Vec<Move> = Vec::new();
@@ -134,7 +189,7 @@ impl Board {
         
         for m in possible_moves {
             let mut test_board = self.clone();
-            test_board.execute_move(&m);
+            test_board.make_move(&m);
             if !test_board.is_in_check(self.white_to_move) {
                 legal_moves.push(m);
             }
@@ -582,11 +637,23 @@ impl Board {
     fn is_in_check(&self, color: Color) -> bool {
         let king = color.king();
 
-        let king_square = self
+        let mut king_square:u8 = 0;
+        let opt_king_square = self
             .pieces
             .iter()
-            .position(|&piece| piece == king)
-            .expect("Board must contain a king") as u8;
+            .position(|&piece| piece == king);
+        match opt_king_square {
+            Some(k) => king_square = k as u8,
+            None => {
+                eprintln!("Board must contain a king!");
+                eprintln!("Last Move: {:?}, current board: {}", self.last_move, self);
+                for p in self.move_history.iter() {
+                    eprintln!("{:?}", p);
+                }
+                panic!()
+            }
+        }
+
 
         let attacking_color = match color {
             Color::White => Color::Black,

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
+use rand::distr::Uniform;
 use rand::seq::IndexedRandom;
 use crate::piece::Piece;
 use crate::board::Board;
@@ -18,11 +20,21 @@ pub mod piece;
 
 fn main() {
     let mut board = setup_board();
+    let mut counter: u64 = 0;
+    let depth = 5;
+    let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    search(&mut board, depth, &mut counter);
+    let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+    eprintln!("Found {counter} moves from the starting position with depth {depth} in {:?}", (end-start));
+    return;
     loop {
         let possible_moves = board.generate_possible_moves();
         let ai_move = possible_moves.choose(&mut rand::rng());
         let ai_move = ai_move.expect("AI lost, as it has no more moves");
-        board.execute_move(ai_move);
+        let undo = board.make_move(ai_move);
+        board.unmake_move(ai_move, undo);
+        board.make_move(ai_move);
 
         println!("{}", move_to_uci(ai_move));
         io::stdout().flush().expect("failed to flush move to gui"); // <-- without this, Python's readline() can hang forever
@@ -40,7 +52,9 @@ fn main() {
             }
         }
         eprintln!("converted extracted move: {player_move:?}");
-        board.execute_move(&player_move);
+        let undo = board.make_move(&player_move);
+        board.unmake_move(&player_move, undo);
+        board.make_move(&player_move);
         print_possible_engine_moves(&board);
         eprintln!("Current board state [Kira] : ", );
         eprintln!("{board}");
@@ -63,6 +77,19 @@ fn get_player_move_from_gui(board: &Board) -> Option<Move> {
 
     let res = uci_to_move(uci_move, board);
     Some(res.expect("invalid move"))
+}
+
+fn search(b:&mut Board, depth: u8, mut counter: &mut u64){
+    if depth == 0{
+        *counter += 1;
+        return;
+    }
+    let possible_moves = b.generate_possible_moves();
+    for m in possible_moves.iter() {
+        let undo = b.make_move(m);
+        search(b, depth-1, counter);
+        b.unmake_move(m, undo);
+    }
 }
 
 /// Parses "position <fen> move <uci>" and returns just the trailing UCI move,
@@ -195,7 +222,7 @@ fn setup_board() -> Board{
         black_queen_castling_possible: true,
         white_queen_castling_possible: true,
         black_king_castling_possible: true,
-        position_history: HashMap::new(),
+        move_history: Vec::new(),
     };
     b
 }
