@@ -1,7 +1,6 @@
-use std::collections::HashMap;
+use std::env;
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::distr::Uniform;
 use rand::seq::IndexedRandom;
 use crate::piece::Piece;
 use crate::board::Board;
@@ -12,21 +11,35 @@ pub mod translate_move_uci;
 pub mod board;
 pub mod piece;
 
-//TODO write unmake move 
-    //TODO to calculate possible moves
+//TODO debug 7 depth perft (setup stockfish with the same stuff)
+//TODO load_fen
 //TODO fuck 50-Move rule, we dont fucking care
 
 
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
-    let mut counter: u64 = 0;
-    let depth = 5;
-    let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    search(&mut board, depth, &mut counter);
-    let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    println!("{:?}", args);
+    if args[1] == "perft" {
+        let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let amount = perft(&mut board, args[2].parse().expect("argument after perft must be integer"));
+        let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-    eprintln!("Found {counter} moves from the starting position with depth {depth} in {:?}", (end-start));
+        eprintln!("found {amount} nodes in {:?}", end-start);
+    }
+    else if args[1] == "dperft" {
+        divided_perft(&mut board, args[2].parse().expect("argument after dperft must be depth"));
+    }
+    else if args[1] == "fperft" {
+        board = load_fen(&args[2]).unwrap();
+        divided_perft(&mut board, args[3].parse().expect(""));
+    }
+    else if args[1] == "fen" {
+        let res = load_fen(&args[2]).unwrap();
+        println!("successfully loaded board: ");
+        println!("{res}");
+    }
     return;
     loop {
         let possible_moves = board.generate_possible_moves();
@@ -62,6 +75,7 @@ fn main() {
     }
 }
 
+
 fn get_player_move_from_gui(board: &Board) -> Option<Move> {
     let mut user_move_buf = String::new();
     io::stdin()
@@ -79,17 +93,97 @@ fn get_player_move_from_gui(board: &Board) -> Option<Move> {
     Some(res.expect("invalid move"))
 }
 
-fn search(b:&mut Board, depth: u8, mut counter: &mut u64){
-    if depth == 0{
-        *counter += 1;
-        return;
+fn perft(b: &mut Board, depth: u8) -> usize {
+    let mut nodes: usize = 0;
+
+    if depth == 0 {
+        return 1;
     }
+
     let possible_moves = b.generate_possible_moves();
+
+    for m in possible_moves.iter() {
+        // Save the complete position BEFORE make_move
+        let original = b.clone();
+
+        let undo = b.make_move(m);
+
+        nodes += perft(b, depth - 1);
+
+        b.unmake_move(m, undo);
+
+        // Verify that unmake restored everything
+        assert_eq!(
+            b.pieces,
+            original.pieces,
+            "PIECES CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.side_to_move,
+            original.side_to_move,
+            "SIDE TO MOVE CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.en_passant_target_square,
+            original.en_passant_target_square,
+            "EN PASSANT CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.white_king_castling_possible,
+            original.white_king_castling_possible,
+            "WHITE KING CASTLING CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.white_queen_castling_possible,
+            original.white_queen_castling_possible,
+            "WHITE QUEEN CASTLING CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.black_king_castling_possible,
+            original.black_king_castling_possible,
+            "BLACK KING CASTLING CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+
+        assert_eq!(
+            b.black_queen_castling_possible,
+            original.black_queen_castling_possible,
+            "BLACK QUEEN CASTLING CORRUPTED by move {:?} at depth {}",
+            m,
+            depth
+        );
+    }
+
+    nodes
+}
+
+fn divided_perft(b:&mut Board, depth: u8) {
+    let possible_moves = b.generate_possible_moves();
+    let mut total_nodes = 0;
     for m in possible_moves.iter() {
         let undo = b.make_move(m);
-        search(b, depth-1, counter);
+        let nodes = perft(b, depth-1);
         b.unmake_move(m, undo);
+        eprintln!("{}: {:?}", move_to_uci(m), nodes);
+        total_nodes += nodes;
     }
+    eprintln!("Searched {} nodes", total_nodes);
 }
 
 /// Parses "position <fen> move <uci>" and returns just the trailing UCI move,
@@ -212,20 +306,16 @@ fn setup_board() -> Board{
             piece_arr[63] = Piece::BRook;
             piece_arr
         },
-        last_move: Move{
-            from: 0,
-            to: 0,
-            move_type: MoveType::Normal,
-        },
-        white_to_move: Color::White,
+        en_passant_target_square: None,
+        side_to_move: Color::White,
         white_king_castling_possible: true,
         black_queen_castling_possible: true,
         white_queen_castling_possible: true,
         black_king_castling_possible: true,
-        move_history: Vec::new(),
     };
     b
 }
+
 
 fn get_rank(index: u8) -> u8{
     (index / 8) as u8
@@ -263,4 +353,139 @@ pub fn offset_square(square: u8, file_offset: i8, rank_offset: i8) -> Option<u8>
     } else {
         None
     }
+}
+
+fn load_fen(fen: &str) -> Result<Board, String> {
+    let fields: Vec<&str> = fen.split_whitespace().collect();
+
+    if fields.len() < 6 {
+        return Err("Invalid FEN: expected 6 fields".to_string());
+    }
+
+    // -------------------------------------------------
+    // Piece placement
+    // -------------------------------------------------
+
+    let mut piece_arr: [Piece; 64] = [Piece::Empty; 64];
+
+    for (fen_rank, rank_data) in fields[0].split('/').enumerate() {
+        if fen_rank >= 8 {
+            return Err("Invalid FEN: too many ranks".to_string());
+        }
+
+        // FEN starts at rank 8, while our board starts at rank 1.
+        let board_rank = 7 - fen_rank;
+
+        let mut file = 0usize;
+
+        for c in rank_data.chars() {
+            if c.is_ascii_digit() {
+                let empty_squares = c.to_digit(10).unwrap() as usize;
+                file += empty_squares;
+            } else {
+                if file >= 8 {
+                    return Err("Invalid FEN: too many squares in rank".to_string());
+                }
+
+                let piece = match c {
+                    'P' => Piece::WPawn,
+                    'N' => Piece::WKnight,
+                    'B' => Piece::WBishop,
+                    'R' => Piece::WRook,
+                    'Q' => Piece::WQueen,
+                    'K' => Piece::WKing,
+
+                    'p' => Piece::BPawn,
+                    'n' => Piece::BKnight,
+                    'b' => Piece::BBishop,
+                    'r' => Piece::BRook,
+                    'q' => Piece::BQueen,
+                    'k' => Piece::BKing,
+
+                    _ => {
+                        return Err(format!(
+                            "Invalid FEN: unknown piece '{}'",
+                            c
+                        ))
+                    }
+                };
+
+                let board_index = board_rank * 8 + file;
+                piece_arr[board_index] = piece;
+
+                file += 1;
+            }
+        }
+
+        if file != 8 {
+            return Err(format!(
+                "Invalid FEN: rank {} does not contain 8 squares",
+                8 - fen_rank
+            ));
+        }
+    }
+
+    // -------------------------------------------------
+    // Side to move
+    // -------------------------------------------------
+
+    let side_to_move = match fields[1] {
+        "w" => Color::White,
+        "b" => Color::Black,
+        _ => return Err("Invalid FEN: invalid side to move".to_string()),
+    };
+
+    // -------------------------------------------------
+    // Castling rights
+    // -------------------------------------------------
+
+    let castling = fields[2];
+
+    let white_king_castling_possible = castling.contains('K');
+    let white_queen_castling_possible = castling.contains('Q');
+    let black_king_castling_possible = castling.contains('k');
+    let black_queen_castling_possible = castling.contains('q');
+
+    // -------------------------------------------------
+    // En passant target square
+    // -------------------------------------------------
+
+    let en_passant_target_square = if fields[3] == "-" {
+        None
+    } else {
+        let bytes = fields[3].as_bytes();
+
+        if bytes.len() != 2 {
+            return Err("Invalid FEN: invalid en-passant square".to_string());
+        }
+
+        let file = match bytes[0] {
+            b'a'..=b'h' => (bytes[0] - b'a') as u8,
+            _ => return Err("Invalid FEN: invalid en-passant file".to_string()),
+        };
+
+        let rank = match bytes[1] {
+            b'1'..=b'8' => (bytes[1] - b'1') as u8,
+            _ => return Err("Invalid FEN: invalid en-passant rank".to_string()),
+        };
+
+        Some(rank * 8 + file)
+    };
+
+    // -------------------------------------------------
+    // Create board
+    // -------------------------------------------------
+
+    Ok(Board {
+        pieces: piece_arr,
+
+        en_passant_target_square,
+
+        side_to_move,
+
+        white_queen_castling_possible,
+        white_king_castling_possible,
+        black_queen_castling_possible,
+        black_king_castling_possible,
+    })
 }

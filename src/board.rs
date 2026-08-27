@@ -16,13 +16,12 @@ mod undo;
 #[derive(Clone)]
 pub struct Board {
     pub pieces: [Piece; 64], 
-    pub last_move: Move,
-    pub white_to_move:Color, 
+    pub en_passant_target_square: Option<u8>,
+    pub side_to_move:Color, 
     pub white_queen_castling_possible: bool,
     pub white_king_castling_possible: bool,
     pub black_queen_castling_possible: bool,
     pub black_king_castling_possible: bool,
-    pub move_history: Vec<Move>,
 
 }
 
@@ -47,46 +46,65 @@ impl fmt::Display for Board {
 impl Board {
     pub fn make_move(&mut self, m: &Move) -> Undo{
         //TODO
+
+        let captured_piece = match m.move_type {
+            MoveType::EnPassant => {
+                match self.side_to_move {
+                    Color::White => self.pieces[(m.to - 8) as usize],
+                    Color::Black => self.pieces[(m.to + 8) as usize],
+                }
+            }
+            _ => self.pieces[m.to as usize],
+        };
         let undo = Undo {
-            captured_piece: self.pieces[m.to as usize],
+            captured_piece: captured_piece,
             old_black_king_castling_possible: self.black_king_castling_possible,
             old_black_queen_castling_possible: self.black_queen_castling_possible,
             old_white_king_castling_possible: self.white_king_castling_possible,
             old_white_queen_castling_possible: self.white_queen_castling_possible,
-            old_last_move: self.last_move,
+            old_en_passant_target_square: self.en_passant_target_square,
         };
 
         let piece = self.pieces[m.from as usize];
-        if m.move_type == MoveType::Normal || m.move_type == MoveType::PawnDoubleStep{
-            self.pieces[m.to as usize] = piece;
-            self.pieces[m.from as usize] = Piece::Empty;
+        let from = m.from as usize;
+        let to = m.to as usize;
+        match m.move_type {
+            MoveType::Normal => {
+                self.pieces[to] = piece;
+                self.pieces[from ] = Piece::Empty;}
+            MoveType::PawnDoubleStep => {
+                self.pieces[to] = piece;
+                self.pieces[from] = Piece::Empty;
+                match self.side_to_move {
+                    Color::White => self.en_passant_target_square = Some((to - 8) as u8),
+                    Color::Black => self.en_passant_target_square = Some((to + 8) as u8), 
+                }
+            }
+            MoveType::CastleKingside => {
+                self.pieces[to ] = piece;
+                self.pieces[from ] = Piece::Empty;
+                self.pieces[(from+1) ] = self.pieces[(to +1) ];
+                self.pieces[(to + 1) ] = Piece::Empty;}
+            MoveType::CastleQueenside => {
+                self.pieces[to ] = piece;
+                self.pieces[from ] = Piece::Empty;
+                self.pieces[(from -1) ] = self.pieces[(from-4) ];
+                self.pieces[(from -4)] = Piece::Empty;}
+            MoveType::Promotion(promotion_piece) => {
+                self.pieces[to] = promotion_piece;
+                self.pieces[from] = Piece::Empty}
+            MoveType::EnPassant => {
+                self.pieces[to] = self.pieces[from]; 
+                self.pieces[from] = Piece::Empty;
+                match self.side_to_move {
+                    Color::White => self.pieces[to-8] = Piece::Empty,
+                    Color::Black => self.pieces[to+8] = Piece::Empty,
+                }
+            }
         }
-        else if m.move_type == MoveType::CastleKingside {
-            self.pieces[m.to as usize] = piece;
-            self.pieces[m.from as usize] = Piece::Empty;
-            self.pieces[(m.from+1) as usize] = self.pieces[(m.to +1) as usize];
-            self.pieces[(m.to + 1) as usize] = Piece::Empty;
-        }
-        else if m.move_type == MoveType::CastleQueenside {
-            self.pieces[m.to as usize] = piece;
-            self.pieces[m.from as usize] = Piece::Empty;
-            self.pieces[(m.from -1) as usize] = self.pieces[(m.from-4) as usize];
-            self.pieces[(m.from -4) as usize] = Piece::Empty;
-
-        }
-        else if let MoveType::Promotion(promotion_piece) = m.move_type {
-            self.pieces[m.to as usize] = promotion_piece;
-            self.pieces[m.from as usize] = Piece::Empty
-        }
-        self.last_move = *m;
-        self.white_to_move = self.white_to_move.invert();
+        if m.move_type != MoveType::PawnDoubleStep {self.en_passant_target_square = None;}
         self.set_castling_rights(m); 
-        //testing if omission of threefold repetition will speed up       
-        let key = self.position_key();
-        self.move_history.push(*m);
-        //if self.is_threefold_repetition() {
-            //eprintln!("Draw by threefold repetition!");
-        //}
+        self.side_to_move = self.side_to_move.invert();
         undo
 
     }
@@ -96,26 +114,32 @@ impl Board {
         self.black_queen_castling_possible = undo.old_black_queen_castling_possible;
         self.white_king_castling_possible = undo.old_white_king_castling_possible;
         self.white_queen_castling_possible = undo.old_white_queen_castling_possible;
-        self.last_move = undo.old_last_move;
-        self.white_to_move = self.white_to_move.invert(); // at the end of the done move, we gave over control to the other player
+        self.en_passant_target_square = undo.old_en_passant_target_square;
+        self.side_to_move = self.side_to_move.invert(); // at the end of the done move, we gave over control to the other player
         let from = m.from as usize;
         let to = m.to as usize;
         match m.move_type {
-            MoveType::Normal | MoveType::PawnDoubleStep => {
+            MoveType::Normal => {
                 self.pieces[from] = self.pieces[to];
                 self.pieces[to] = undo.captured_piece;
             }
+            MoveType::PawnDoubleStep => {
+                self.pieces[from] = self.pieces[to];
+                assert_eq!(self.pieces[to], self.side_to_move.pawn());
+                self.pieces[to] = Piece::Empty;
+
+            }
             MoveType::Promotion(_) => {
-                self.pieces[from] = self.white_to_move.pawn();
+                self.pieces[from] = self.side_to_move.pawn();
                 self.pieces[to] = undo.captured_piece;
             } 
             MoveType::EnPassant => {
                 self.pieces[from] = self.pieces[to];
                 self.pieces[to] = Piece::Empty;
                 //match color
-                match self.white_to_move {
-                    Color::White => self.pieces[to-8] = self.white_to_move.pawn(),
-                    Color::Black => self.pieces[to+8] = self.white_to_move.pawn(),
+                match self.side_to_move {
+                    Color::White => self.pieces[to-8] = Color::Black.pawn(),
+                    Color::Black => self.pieces[to+8] = Color::White.pawn(),
                 }
             }
             MoveType::CastleKingside => {
@@ -131,7 +155,6 @@ impl Board {
                 self.pieces[from -1] = Piece::Empty;
             }
         }
-        self.move_history.pop();
     }
 
     // pub fn is_threefold_repetition(&self) -> bool {
@@ -144,7 +167,7 @@ impl Board {
         let mut possible_moves:Vec<Move> = Vec::new();
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
-            let color = self.white_to_move;
+            let color = self.side_to_move;
             match color {
                 Color::White => {
                     match piece {
@@ -190,7 +213,7 @@ impl Board {
         for m in possible_moves {
             let mut test_board = self.clone();
             test_board.make_move(&m);
-            if !test_board.is_in_check(self.white_to_move) {
+            if !test_board.is_in_check(self.side_to_move) {
                 legal_moves.push(m);
             }
         }
@@ -200,7 +223,7 @@ impl Board {
     fn generate_pawn_moves(&self, square: u8) -> Vec<Move>{
         let mut possible_moves = Vec::new();
 
-        let pawn_rank_direction = match self.white_to_move {
+        let pawn_rank_direction = match self.side_to_move {
             Color::White => 1,
             Color::Black => -1
         };
@@ -208,7 +231,7 @@ impl Board {
         if let Some(pawn_square) = 
             offset_square(square, 0, pawn_rank_direction) {
             if self.pieces[pawn_square as usize] == Piece::Empty {
-                if get_rank(pawn_square) == 7 {
+                if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
                     possible_moves = self._generate_promotion_moves(square, pawn_square, possible_moves);
                 }
                 else {
@@ -219,7 +242,7 @@ impl Board {
                     });
                 }
                 //step by two
-                if get_rank(square) == match self.white_to_move {
+                if get_rank(square) == match self.side_to_move {
                         Color::White => 1, 
                         Color::Black => 6
                     }{
@@ -242,32 +265,29 @@ impl Board {
         for file_offset in [-1, 1] {
             if let Some(pawn_square) = 
                 offset_square(square, file_offset, pawn_rank_direction){
-                    if self.pieces[pawn_square as usize].color() == Some(self.white_to_move.invert()) {
-                        if get_rank(pawn_square) == 7 {
+                    if self.pieces[pawn_square as usize].color() == Some(self.side_to_move.invert()) {
+                        if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
                                 possible_moves = self._generate_promotion_moves(square, pawn_square, possible_moves);
-                            }
-                            else {
-                                possible_moves.push(Move {
-                                    from: square,
-                                    to: pawn_square,
-                                    move_type: MoveType::Normal,
-                                });
-                            }
-                    }
-                    //en passant
-                    if self.last_move.move_type == MoveType::PawnDoubleStep
-                        && self.pieces[pawn_square as usize] == Piece::Empty { //check for en-passant
-                            let last_move_dest = self.last_move.to;
-                        if get_rank(square) == get_rank(last_move_dest) && 
-                            
-                            get_file(square).abs_diff(get_file(last_move_dest)) == 1{
-                                possible_moves.push(Move {
-                                    from: square,
-                                    to: pawn_square,
-                                    move_type: MoveType::EnPassant
-                                })
+                        }
+                        else {
+                            possible_moves.push(Move {
+                                from: square,
+                                to: pawn_square,
+                                move_type: MoveType::Normal,
+                            });
                         }
                     }
+                    //en passant
+                    if let Some(en_square) = self.en_passant_target_square {
+                        if pawn_square == en_square{
+                            possible_moves.push(Move{
+                                from: square,
+                                to: pawn_square,
+                                move_type: MoveType::EnPassant,
+                            });
+                        }
+                    } 
+                    
                 }
 
         }
@@ -278,22 +298,22 @@ impl Board {
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
-            move_type: MoveType::Promotion(self.white_to_move.bishop())
+            move_type: MoveType::Promotion(self.side_to_move.bishop())
         });
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
-            move_type: MoveType::Promotion(self.white_to_move.knight())
+            move_type: MoveType::Promotion(self.side_to_move.knight())
         });
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
-            move_type: MoveType::Promotion(self.white_to_move.rook())
+            move_type: MoveType::Promotion(self.side_to_move.rook())
         });
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
-            move_type: MoveType::Promotion(self.white_to_move.queen())
+            move_type: MoveType::Promotion(self.side_to_move.queen())
         });
         
         possible_moves
@@ -315,7 +335,7 @@ impl Board {
         
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
             if let Some(destination) = offset_square(square, file_offset, rank_offset) {
-                if self.pieces[destination as usize].color() != Some(self.white_to_move) {
+                if self.pieces[destination as usize].color() != Some(self.side_to_move) {
                     possible_moves.push(Move {
                         from: square,
                         to: destination,
@@ -346,13 +366,13 @@ impl Board {
 
                 current = next; 
                 if self.pieces[current as usize].color() !=
-                    Some(self.white_to_move) {
+                    Some(self.side_to_move) {
                         possible_moves.push(Move{
                         from: square,
                         to: current,
                         move_type: MoveType::Normal,
                     });
-                        if self.pieces[current as usize].color() == Some(self.white_to_move.invert()) {
+                        if self.pieces[current as usize].color() == Some(self.side_to_move.invert()) {
                             break; //break here, because we cannot move further than a piece we could capture
                         }
                 }
@@ -384,13 +404,13 @@ impl Board {
 
                 current = next; 
                 if self.pieces[current as usize].color() !=
-                    Some(self.white_to_move) {
+                    Some(self.side_to_move) {
                         possible_moves.push(Move{
                         from: square,
                         to: current,
                         move_type: MoveType::Normal,
                     });
-                    if self.pieces[current as usize].color() == Some(self.white_to_move.invert()) {
+                    if self.pieces[current as usize].color() == Some(self.side_to_move.invert()) {
                         break; //break here, because we cannot move further than a piece we could capture
                     }
                 }
@@ -419,18 +439,18 @@ impl Board {
         for (file_offset, rank_offset) in KING_OFFSETS {
             if let Some(destination) = 
                 offset_square(square, file_offset, rank_offset) {
-                    if self.pieces[destination as usize].color() != Some(self.white_to_move) {
+                    if self.pieces[destination as usize].color() != Some(self.side_to_move) {
                         possible_moves.push(Move {
                             from: square, 
                             to: destination,
                             move_type: MoveType::Normal,
-                        })
+                        });
                     }
                 }
         }
         //determine if castling is possible
         //castling is possible if king and rook have not been taken or been moved
-        if self.white_to_move == Color::White {
+        if self.side_to_move == Color::White {
             if self.white_king_castling_possible {
                 if !self.is_square_attacked(5, Color::Black) &&
                     !self.is_square_attacked(6, Color::Black) &&
@@ -440,7 +460,7 @@ impl Board {
                                 from: 4,
                                 to: 6,
                                 move_type: MoveType::CastleKingside
-                            })
+                            });
                         }   
                     }
             }
@@ -448,12 +468,12 @@ impl Board {
                 if !self.is_square_attacked(2, Color::Black) &&
                     !self.is_square_attacked(3, Color::Black) &&
                     !self.is_square_attacked(4, Color::Black) {
-                        if self.pieces[2] == Piece::Empty && self.pieces[3] == Piece::Empty{
+                        if self.pieces[1] == Piece::Empty && self.pieces[2] == Piece::Empty && self.pieces[3] == Piece::Empty{
                             possible_moves.push(Move {
                                 from: 4, 
                                 to: 2,
                                 move_type: MoveType::CastleQueenside
-                            })
+                            });
                         }
                         
                     }
@@ -461,30 +481,30 @@ impl Board {
         }
         else {
             if self.black_king_castling_possible {
-                if !self.is_square_attacked(62, Color::Black) &&
-                    !self.is_square_attacked(61, Color::Black) &&
-                    !self.is_square_attacked(60, Color::Black){
+                if !self.is_square_attacked(62, Color::White) &&
+                    !self.is_square_attacked(61, Color::White) &&
+                    !self.is_square_attacked(60, Color::White){
                         if self.pieces[61] == Piece::Empty && self.pieces[62] == Piece::Empty{
                             possible_moves.push(Move {
                             from: 60,
                             to: 62,
                             move_type: MoveType::CastleKingside
-                            })
+                            });
                         }
                         
                     }
                 
             }
             if self.black_queen_castling_possible {
-                if !self.is_square_attacked(58, Color::Black) &&
-                    !self.is_square_attacked(59, Color::Black) &&
-                    !self.is_square_attacked(60, Color::Black) {
-                        if self.pieces[59] == Piece::Empty && self.pieces[58] == Piece::Empty{
+                if !self.is_square_attacked(58, Color::White) &&
+                    !self.is_square_attacked(59, Color::White) &&
+                    !self.is_square_attacked(60, Color::White) {
+                        if self.pieces[59] == Piece::Empty && self.pieces[58] == Piece::Empty && self.pieces[57] == Piece::Empty{
                             possible_moves.push(Move {
                             from: 60, 
                             to: 58,
                             move_type: MoveType::CastleQueenside
-                        })
+                        });
                         }
                     }
             }
@@ -646,10 +666,7 @@ impl Board {
             Some(k) => king_square = k as u8,
             None => {
                 eprintln!("Board must contain a king!");
-                eprintln!("Last Move: {:?}, current board: {}", self.last_move, self);
-                for p in self.move_history.iter() {
-                    eprintln!("{:?}", p);
-                }
+                eprintln!("current board: {}", self);
                 panic!()
             }
         }
@@ -663,49 +680,36 @@ impl Board {
         self.is_square_attacked(king_square, attacking_color)
     }
 
-    fn set_castling_rights(&mut self, m: &Move){
+    fn set_castling_rights(&mut self, m: &Move) {
+        // A rook moved
         match m.from {
+            0 => self.white_queen_castling_possible = false,  // a1
+            7 => self.white_king_castling_possible = false,  // h1
+            56 => self.black_queen_castling_possible = false, // a8
+            63 => self.black_king_castling_possible = false, // h8
+            _ => {}
+        }
+
+        // A rook was captured
+        match m.to {
             0 => self.white_queen_castling_possible = false,
             7 => self.white_king_castling_possible = false,
-            55 => self.black_queen_castling_possible = false,
+            56 => self.black_queen_castling_possible = false,
             63 => self.black_king_castling_possible = false,
-            _ => ()
-        };
-        
-        //rook got taken
-        if self.white_to_move == Color::White {
-            match m.to {
-                55 => self.black_queen_castling_possible = false,
-                63 => self.black_king_castling_possible = false,
-                _ => (),
-            }
-        }
-        else {
-            match m.to {
-                0 => self.black_queen_castling_possible = false,
-                7 => self.black_king_castling_possible = false,
-                _ => (),
-            }
-        }
-        //king moved
-        match self.pieces[m.from as usize] {
-            Piece::BKing => {self.black_king_castling_possible = false;
-                self.black_queen_castling_possible = false }
-            Piece::WKing => {self.white_king_castling_possible = false;
-            self.white_queen_castling_possible = false}
-            _ => ()
+            _ => {}
         }
 
-    }
-
-    fn position_key(&self) ->PositionKey {
-        PositionKey {
-            pieces: self.pieces,
-            side_to_move: self.white_to_move,
-            white_king_castling: self.white_king_castling_possible, 
-            white_queen_castling: self.white_queen_castling_possible,
-            black_king_castling: self.black_king_castling_possible,
-            black_queen_castling: self.black_queen_castling_possible, 
+        // A king moved
+        match self.pieces[m.to as usize] {
+            Piece::WKing => {
+                self.white_king_castling_possible = false;
+                self.white_queen_castling_possible = false;
+            }
+            Piece::BKing => {
+                self.black_king_castling_possible = false;
+                self.black_queen_castling_possible = false;
+            }
+            _ => {}
         }
     }
 
