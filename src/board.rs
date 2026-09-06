@@ -8,10 +8,10 @@ use crate::MoveType;
 use crate::offset_square;
 use crate::get_rank;
 use crate::get_file;
-use position_key::PositionKey;
+use position_key::zobrist_hash;
 use undo::Undo;
 
-mod position_key;
+pub mod position_key;
 mod undo;
 #[derive(Clone)]
 pub struct Board {
@@ -22,6 +22,7 @@ pub struct Board {
     pub white_king_castling_possible: bool,
     pub black_queen_castling_possible: bool,
     pub black_king_castling_possible: bool,
+    pub position_history_hashed: Vec<u64>,
 
 }
 
@@ -104,6 +105,7 @@ impl Board {
         }
         if m.move_type != MoveType::PawnDoubleStep {self.en_passant_target_square = None;}
         self.set_castling_rights(m); 
+        self.position_history_hashed.push(position_key::zobrist_hash(&self));
         self.side_to_move = self.side_to_move.invert();
         undo
 
@@ -156,12 +158,7 @@ impl Board {
             }
         }
     }
-
-    // pub fn is_threefold_repetition(&self) -> bool {
-    //     self.position_history
-    //         .get(&self.position_key())
-    //         .is_some_and(|&count| count >= 3)
-    // }
+ 
 
     pub fn generate_possible_moves(&self) -> Vec<Move> {
         let mut possible_moves:Vec<Move> = Vec::new();

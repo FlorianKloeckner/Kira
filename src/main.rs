@@ -20,6 +20,7 @@ pub mod piece;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
+
     println!("{:?}", args);
     if args[1] == "perft" {
         let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
@@ -39,6 +40,8 @@ fn main() {
         let res = load_fen(&args[2]).unwrap();
         println!("successfully loaded board: ");
         println!("{res}");
+        let zobrist =  board::position_key::zobrist_hash(&res);
+        println!("zobrist key: {:#x}", zobrist);
     }
     return;
     loop {
@@ -312,16 +315,17 @@ fn setup_board() -> Board{
         black_queen_castling_possible: true,
         white_queen_castling_possible: true,
         black_king_castling_possible: true,
+        position_history_hashed: Vec::new(),
     };
     b
 }
 
 
-fn get_rank(index: u8) -> u8{
+pub fn get_rank(index: u8) -> u8{
     (index / 8) as u8
 }
 
-fn get_file(index: u8) -> u8{
+pub fn get_file(index: u8) -> u8{
     (index % 8) as u8
 }
 
@@ -487,5 +491,6 @@ fn load_fen(fen: &str) -> Result<Board, String> {
         white_king_castling_possible,
         black_queen_castling_possible,
         black_king_castling_possible,
+        position_history_hashed: Vec::new(),
     })
 }
