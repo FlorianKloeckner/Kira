@@ -1,14 +1,11 @@
 use core::panic;
 use std::fmt;
-use std::collections::HashMap;
 use crate::piece::Piece;
 use crate::Move;
 use crate::Color;
 use crate::MoveType;
 use crate::offset_square;
 use crate::get_rank;
-use crate::get_file;
-use position_key::zobrist_hash;
 use undo::Undo;
 
 pub mod position_key;
@@ -157,6 +154,7 @@ impl Board {
                 self.pieces[from -1] = Piece::Empty;
             }
         }
+        self.position_history_hashed.pop();
     }
  
 
@@ -749,5 +747,47 @@ impl Board {
             }
         }
         fen_string
+    }
+
+    pub fn evaluate(&self) -> isize {
+        let mut score = 0;
+        for p in self.pieces.iter() {
+            score += p.score();
+        }
+        score * self.side_to_move.value()
+    }
+
+    pub fn search(&mut self, depth: usize) -> Move{
+        let possible_moves = self.generate_possible_moves();
+        let mut best_move: Move = possible_moves[0];
+        let mut max = -10000;
+        for m in possible_moves.iter() {
+            let undo = self.make_move(m);
+            let score = self.nega_max(depth, -10000, 10000);
+            if score > max {
+                max = score;
+                best_move = m.clone();
+            }
+            self.unmake_move(m, undo);
+
+        }
+        best_move
+    }
+
+    fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
+        if depth == 0 {return self.evaluate()}
+        let score = -10000;
+        for m in self.generate_possible_moves().iter(){
+            let undo = self.make_move(m);
+            let mut score = -10000000;
+            score = Ord::max(-self.nega_max(depth-1, -beta, -alpha), 
+                score);
+            alpha = Ord::max(alpha, score);
+            if alpha >= beta {
+                break;
+            }
+            self.unmake_move(m, undo);
+        }
+        score
     }
 }

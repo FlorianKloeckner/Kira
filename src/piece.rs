@@ -26,6 +26,19 @@ impl Piece {
             Piece::BKing|Piece::BQueen|Piece::BBishop|Piece::BRook|Piece::BKnight|Piece::BPawn => Some(Color::Black),
         }
     }
+    pub fn score(&self) -> isize {
+        match self {
+            Piece::Empty|Piece::WKing|Piece::BKing => 0, 
+            Piece::WPawn => 1, 
+            Piece::WBishop|Piece::WKnight => 3,
+            Piece::WRook => 5,
+            Piece::WQueen => 9,
+            Piece::BPawn => -1, 
+            Piece::BBishop|Piece::BKnight => -3, 
+            Piece::BRook => -5,
+            Piece::BQueen => -9,  
+        }
+    }
 }
 
 impl fmt::Display for Piece {

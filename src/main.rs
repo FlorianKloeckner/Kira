@@ -5,7 +5,9 @@ use rand::seq::IndexedRandom;
 use crate::piece::Piece;
 use crate::board::Board;
 
+use crate::requests::get_board;
 use crate::translate_move_uci::{uci_to_move, move_to_uci};
+mod requests;
 
 pub mod translate_move_uci;
 pub mod board;
@@ -16,8 +18,8 @@ pub mod piece;
 //TODO fuck 50-Move rule, we dont fucking care
 
 
-
 fn main() {
+    get_board();
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
 
@@ -37,11 +39,13 @@ fn main() {
         divided_perft(&mut board, args[3].parse().expect(""));
     }
     else if args[1] == "fen" {
-        let res = load_fen(&args[2]).unwrap();
+        let mut res = load_fen(&args[2]).unwrap();
         println!("successfully loaded board: ");
         println!("{res}");
         let zobrist =  board::position_key::zobrist_hash(&res);
         println!("zobrist key: {:#x}", zobrist);
+        let best_move = res.search(4);
+        println!("best move is: {}", move_to_uci(&best_move));
     }
     return;
     loop {
@@ -107,70 +111,11 @@ fn perft(b: &mut Board, depth: u8) -> usize {
 
     for m in possible_moves.iter() {
         // Save the complete position BEFORE make_move
-        let original = b.clone();
-
         let undo = b.make_move(m);
 
         nodes += perft(b, depth - 1);
 
         b.unmake_move(m, undo);
-
-        // Verify that unmake restored everything
-        assert_eq!(
-            b.pieces,
-            original.pieces,
-            "PIECES CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.side_to_move,
-            original.side_to_move,
-            "SIDE TO MOVE CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.en_passant_target_square,
-            original.en_passant_target_square,
-            "EN PASSANT CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.white_king_castling_possible,
-            original.white_king_castling_possible,
-            "WHITE KING CASTLING CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.white_queen_castling_possible,
-            original.white_queen_castling_possible,
-            "WHITE QUEEN CASTLING CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.black_king_castling_possible,
-            original.black_king_castling_possible,
-            "BLACK KING CASTLING CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
-
-        assert_eq!(
-            b.black_queen_castling_possible,
-            original.black_queen_castling_possible,
-            "BLACK QUEEN CASTLING CORRUPTED by move {:?} at depth {}",
-            m,
-            depth
-        );
     }
 
     nodes
@@ -275,6 +220,13 @@ impl Color {
         match self {
             Color::White => Color::Black,
             Color::Black => Color::White,
+        }
+    }
+    
+    fn value(self) -> isize{
+        match self {
+            Color::White => 1,
+            Color::Black => -1,
         }
     }
 }

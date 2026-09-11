@@ -44,7 +44,6 @@ pub fn zobrist_hash(board: &Board)  -> u64{
 
     //zobrist enpassant
     let mut en_passant = 0;
-    println!("en_passant target square: {:?}", board.en_passant_target_square);
     if let Some(square) = board.en_passant_target_square {
         for file_offset in [-1, 1] {
             let rank_offset = match board.side_to_move {
@@ -52,7 +51,6 @@ pub fn zobrist_hash(board: &Board)  -> u64{
                 Color::Black => 1,
             };
             if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset) {
-                println!("target_square: {:?}", target_square);
                 if board.pieces[target_square as usize] == board.side_to_move.pawn() {
                     let index = crate::get_file(square) as usize;
                     en_passant = Random64[772 + index];
@@ -61,7 +59,6 @@ pub fn zobrist_hash(board: &Board)  -> u64{
             }
         }  
     }
-    println!("en_passant value: {}", en_passant);
 
     //zobrist turn
     let mut turn = 0;
