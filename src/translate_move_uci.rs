@@ -10,7 +10,7 @@ fn square_to_algebraic(square: u8) -> String {
     format!("{file}{rank}")
 }
 
-fn algebraic_to_square(s: &str) -> Option<u8> {
+pub fn algebraic_to_square(s: &str) -> Option<u8> {
     let mut chars = s.chars();
     let file = chars.next()?;
     let rank = chars.next()?;

@@ -1,3 +1,4 @@
+use core::borrow;
 use std::env;
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -5,12 +6,13 @@ use rand::seq::IndexedRandom;
 use crate::piece::Piece;
 use crate::board::Board;
 
-use crate::requests::get_board;
+use crate::requests::update_board;
 use crate::translate_move_uci::{uci_to_move, move_to_uci};
 mod requests;
 
+mod board;
+
 pub mod translate_move_uci;
-pub mod board;
 pub mod piece;
 
 //TODO debug 7 depth perft (setup stockfish with the same stuff)
@@ -19,9 +21,18 @@ pub mod piece;
 
 
 fn main() {
-    get_board();
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
+    let opt_board = update_board(&mut board);
+    match opt_board {
+        Some(b) => board = b,
+        None => (),
+    }
+
+    eprintln!("{}", board);
+    eprintln!("Castling rights: {:?}{:?}{:?}{:?}", board.white_king_castling_possible, board.white_queen_castling_possible
+    ,board.black_king_castling_possible, board.black_queen_castling_possible);
+
 
     println!("{:?}", args);
     if args[1] == "perft" {

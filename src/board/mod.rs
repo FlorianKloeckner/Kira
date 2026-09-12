@@ -1,3 +1,4 @@
+
 use core::panic;
 use std::fmt;
 use crate::piece::Piece;
@@ -102,7 +103,7 @@ impl Board {
         }
         if m.move_type != MoveType::PawnDoubleStep {self.en_passant_target_square = None;}
         self.set_castling_rights(m); 
-        self.position_history_hashed.push(position_key::zobrist_hash(&self));
+        self.add_current_position_to_history();
         self.side_to_move = self.side_to_move.invert();
         undo
 
@@ -789,5 +790,9 @@ impl Board {
             self.unmake_move(m, undo);
         }
         score
+    }
+
+    pub fn add_current_position_to_history(&mut self){
+        self.position_history_hashed.push(position_key::zobrist_hash(&self));
     }
 }
