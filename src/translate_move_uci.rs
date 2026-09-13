@@ -4,7 +4,7 @@ use crate::MoveType;
 use crate::board::Board;
 
 
-fn square_to_algebraic(square: u8) -> String {
+pub fn square_to_algebraic(square: u8) -> String {
     let file = (b'a' + (square % 8)) as char;
     let rank = (b'1' + (square / 8)) as char;
     format!("{file}{rank}")

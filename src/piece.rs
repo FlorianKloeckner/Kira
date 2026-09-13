@@ -39,6 +39,19 @@ impl Piece {
             Piece::BQueen => -9,  
         }
     }
+
+    pub fn uppercase_str(&self) -> &str{
+        match self {
+            Piece::WPawn|Piece::BPawn => "PAWN",
+            Piece::WBishop|Piece::BBishop => "KNIGHT", //knight and bishop are switched
+            Piece::WKnight|Piece::BKnight => "BISHOP",
+            Piece::WRook|Piece::BRook => "ROOK",
+            Piece::WQueen|Piece::BQueen => "QUEEN",
+            Piece::WKing|Piece::BKing => "KING",
+            Piece::Empty => "EMPTY" //This case should never happen
+
+        }
+    }
 }
 
 impl fmt::Display for Piece {
@@ -59,6 +72,7 @@ impl fmt::Display for Piece {
             Piece::WPawn  => '♟',
         };
 
-        write!(f, "{}", symbol)
+        write!(f, "{}", symbol);
+        Ok(())//this seems wrong
     }
 }

@@ -3,7 +3,7 @@ use reqwest::blocking::Client;
 use serde_json::Value;
 use std::{collections::HashMap, io::Read};
 
-use crate::{Color, board::Board, piece::Piece, requests, translate_move_uci};
+use crate::{Color, Move, MoveType, board::Board, piece::Piece, requests, translate_move_uci::{self, square_to_algebraic}};
 
 const URL:&str = "http://localhost:12345";
 
@@ -255,9 +255,34 @@ fn parse_response(text: &str) -> Option<Board> {
 
 pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
     let client = Client::new();
-    let mut payload = HashMap::new();
-    map.insert("type", "GET_BOARD");
-    map.insert("id", "1");
-    let payload = HashMap
-    let response = client.post()
+    let move_json = match m.move_type {
+        MoveType::Promotion(new_piece) => serde_json::json!({
+            "type": "PAWN_REACHES_END_MOVE",
+            "from": &m.from,
+            "to": &m.to,
+            "newPiece": &new_piece.uppercase_str()
+        }),
+        MoveType::CastleKingside| MoveType::CastleQueenside => serde_json::json!({
+            "type": "CASTLING_MOVE",
+            "from": &m.from,
+            "to":&m.to
+        }),
+        _ => serde_json::json!({
+            "type": "NORMAL",
+            "from": square_to_algebraic(m.from),
+            "to": square_to_algebraic(m.to)
+        }),
+    };
+    let payload = serde_json::json!({
+        "type": "MOVE",
+        "password": color_pass,
+        "move": move_json
+    });
+    let response = client
+        .post(URL)
+        .json(&payload)
+        .send();
+
+    eprintln!("{response}");
+    Ok(());
 }
