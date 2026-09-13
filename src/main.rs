@@ -1,10 +1,11 @@
 use std::env;
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::seq::IndexedRandom;
+use rand::seq::{IndexedRandom, SliceRandom};
 use crate::piece::Piece;
 use crate::board::Board;
 
+use crate::requests::update_board;
 use crate::translate_move_uci::{move_to_uci, square_to_algebraic, uci_to_move};
 mod requests;
 
@@ -54,26 +55,37 @@ fn main() {
     return;
 }
 
-fn test_full_game_benjo_server(){
+fn test_full_game_benjo_server() -> Option<()>{
 
     let res = square_to_algebraic(9);
     eprintln!("{}, {}", res, res.to_ascii_uppercase());
     let mut board = setup_board();
-    for _ in 0..20 {
-        let m = board.generate_possible_moves()[0];
-        let color_pass = match board.side_to_move {
-            Color::Black => "1234",
-            Color::White => "5678", //Why are they switched???
-        };
-        let _ = requests::send_move(m, color_pass);
+    let mut rng = rand::rng();
+    for _ in 0..2000 {
+        let possible_moves = board.generate_possible_moves();
+        let m = possible_moves.choose(&mut rand::rng())?;
+        let response = requests::send_move(m, board.side_to_move);
+        if let Err(msg) = response {
+            eprintln!("ERROR: {msg}");
+            panic!();
+        }
 
+        
+        let mut new_board = update_board(&mut board)?;
         board.make_move(&m);
+        new_board.position_history_hashed = Vec::new();
+        board.position_history_hashed = Vec::new();
         eprintln!("{}", board);
         eprintln!("made move: {}", move_to_uci(&m));
-        if board.is_checkmate() {
-            return
+
+        assert_eq!(board, new_board);
+
+
+        if board.is_checkmate() | board.is_draw() {
+            return None
         }
     }
+    None
 
 }
 
@@ -222,6 +234,13 @@ impl Color {
         match self {
             Color::White => 1,
             Color::Black => -1,
+        }
+    }
+
+    fn password(self) -> &'static str{
+        match self {
+            Color::Black => "1234",
+            Color::White => "5678",
         }
     }
 }

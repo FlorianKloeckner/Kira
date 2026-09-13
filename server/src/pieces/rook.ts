@@ -64,12 +64,14 @@ export class Rook extends Piece {
   }
 
   public moveTo(coordinates: Coordinates): void {
+    this.hasMoved_ = true;
     this.coordinates = coordinates.clone();
   }
 
   public doMove(move: Move): void {
     if (!this.canDoMove(move)) throw Error("Cannot do the move!");
     if (move instanceof NormalMove) {
+      this.hasMoved_ = true;
       this.getBoard().removePiece(move.getTo());
       this.coordinates = move.getTo().clone();
     }

@@ -1,9 +1,10 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use serde_json::Value;
+use core::error;
 use std::{collections::HashMap, io::Read};
 
-use crate::{Color, Move, MoveType, board::Board, piece::Piece, requests, translate_move_uci::{self, square_to_algebraic}};
+use crate::{Color, Move, MoveType, board::Board, offset_square, piece::Piece, requests, translate_move_uci::{self, square_to_algebraic}};
 
 const URL:&str = "http://localhost:12345";
 
@@ -84,12 +85,11 @@ fn get_board() -> Option<Board> {
                 None
             })?;
             if en_pass_possible{
-                en_passant_target_square = Some(get_en_pass_target_square(square, side_to_move));
+                en_passant_target_square = Some(get_en_pass_target_square(square, side_to_move.invert()));
             }
         }
         pieces[square as usize] = piece;
 
-        eprintln!("Found piece {piece:?} on square: {}", square);
     }
 
     //we cannot return the whole position history, since the server does not return 
@@ -101,7 +101,7 @@ fn get_board() -> Option<Board> {
     let mut black_queen_castling_possible = false;
     let mut black_king_castling_possible = false;
 
-    if !has_piece_on_square_moved(&json_pieces, "a0") &&
+    if !has_piece_on_square_moved(&json_pieces, "a1") &&
         !has_piece_on_square_moved(&json_pieces, "e1") &&
         pieces[0] == Piece::WRook &&
         pieces[4] == Piece::WKing {
@@ -141,7 +141,7 @@ fn get_board() -> Option<Board> {
 } 
 //color is the color of the piece on square
 fn get_en_pass_target_square(square: u8, color: Color) -> u8{
-    square -(8*color.value()) as u8 //this should not fail, but is not the idiomatic way
+    offset_square(square, 0, (color.value()*-1) as i8).expect("could not offset square: {square} by rank: {color.value}")
 }
 
 fn has_piece_on_square_moved(pieces: &Vec<Value>, square: &str) -> bool{
@@ -161,7 +161,8 @@ fn has_piece_on_square_moved(pieces: &Vec<Value>, square: &str) -> bool{
             None => continue,
         }
     }
-    false
+    
+    true
 }
 
 fn piece_name_color_to_piece(piece_name: &str, piece_color: &str) -> Option<Piece>{
@@ -253,20 +254,27 @@ fn parse_response(text: &str) -> Option<Board> {
     None
 }
 
-pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
+pub fn send_move(m: &Move, color: Color) -> Result<String>{
     let client = Client::new();
     let move_json = match m.move_type {
         MoveType::Promotion(new_piece) => serde_json::json!({
             "type": "PAWN_REACHES_END_MOVE",
-            "from": &m.from,
-            "to": &m.to,
+            "from": square_to_algebraic(m.from).to_ascii_uppercase(),
+            "to": square_to_algebraic(m.to).to_ascii_uppercase(), 
             "newPiece": &new_piece.uppercase_str()
         }),
-        MoveType::CastleKingside| MoveType::CastleQueenside => serde_json::json!({
+        MoveType::CastleKingside| MoveType::CastleQueenside => {
+            let rook_square = match m.move_type {
+                MoveType::CastleKingside => m.to +1,
+                MoveType::CastleQueenside => m.to -2,
+                _ => return Err(anyhow!("Something went very wrong!!"))
+            };
+            serde_json::json!({
             "type": "CASTLING_MOVE",
-            "from": &m.from,
-            "to":&m.to
-        }),
+            "king": square_to_algebraic(m.from).to_ascii_uppercase(),
+            "rook":&square_to_algebraic(rook_square).to_ascii_uppercase(),
+            
+        })},
         _ => serde_json::json!({
             "type": "NORMAL_MOVE",
             "from": square_to_algebraic(m.from).to_ascii_uppercase(),
@@ -275,7 +283,7 @@ pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
     };
     let payload = serde_json::json!({
         "type": "MOVE",
-        "password": color_pass,
+        "password": color.password(),
         "move": move_json
     });
     let response = client
@@ -283,6 +291,11 @@ pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
         .json(&payload)
         .send()?;
 
-    eprintln!("{:?}", response.text());
-    Ok(())
+    let txt = response.text()?;
+    eprintln!("{txt}");
+    let dict: Value = serde_json::from_str(&txt)?;
+    if let Some(err_msg) = dict["response"].get("error") {
+        return Err(anyhow!(err_msg.to_string()));
+    }
+    Ok(txt)
 }

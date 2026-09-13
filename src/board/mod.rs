@@ -11,7 +11,7 @@ use undo::Undo;
 
 pub mod position_key;
 mod undo;
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Board {
     pub pieces: [Piece; 64], 
     pub en_passant_target_square: Option<u8>,
@@ -800,5 +800,10 @@ impl Board {
     pub fn is_checkmate(&self) -> bool {
         self.generate_possible_moves().len() == 0 
         && self.is_in_check(self.side_to_move)
+    }
+
+    pub fn is_draw(&self) -> bool {
+        //returns true if no pieces other than kings are on the board
+        self.pieces.iter().filter(|x| **x != Piece::WKing && **x != Piece::BKing && **x != Piece::Empty).count() == 0
     }
 }

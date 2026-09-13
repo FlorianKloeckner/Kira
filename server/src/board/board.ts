@@ -105,21 +105,25 @@ export class Board {
   }
 
   public isInCheck(player: PlayerType): boolean {
+    const kingCoordinates = this.getKing(player).getCoordinates();
     return (
-      this.getPossibleMoves()
-        .filter(
-          (move) =>
-            move instanceof NormalMove || move instanceof PawnReachesEndMove,
+      this.getPieces()
+        .filter((piece) => piece.getPlayer() == getOtherPlayer(player))
+        .some((piece) =>
+          piece
+            .getPossibleMoves()
+            .filter(
+              (move) =>
+                move instanceof NormalMove ||
+                move instanceof PawnReachesEndMove,
+            )
+            .some((move) => equals(move.getTo(), kingCoordinates)),
         )
-        .filter(
-          (move) =>
-            move.getTo() ==
-            this.getKing(getOtherPlayer(player)).getCoordinates(),
-        ).length != 0
     );
   }
 
   private _doMove(move: Move): void {
+    this.pieces.forEach((piece) => piece.resetEnPassePossible());
     const piece = this.getPiece(move.getActingPiece());
     if (piece == null) throw Error("Piece does not exist!");
     piece.doMove(move);

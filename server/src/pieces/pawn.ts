@@ -40,6 +40,10 @@ export class PseudoPawn extends Piece {
     return this.piece.canDoMove(move);
   }
 
+  public resetEnPassePossible(): void {
+    this.piece.resetEnPassePossible();
+  }
+
   public doMove(move: Move): void {
     this.piece.doMove(move);
     this.coordinates = NormalCoordinates.fromCoordinates(
@@ -171,6 +175,10 @@ class Pawn extends Piece {
     return this.enPassePossible;
   }
 
+  public resetEnPassePossible(): void {
+    this.enPassePossible = false;
+  }
+
   public doMove(move: Move): void {
     if (!this.canDoMove(move)) throw Error("Cannot do the move!");
     if (move instanceof NormalMove || move instanceof PawnReachesEndMove) {
@@ -181,6 +189,10 @@ class Pawn extends Piece {
           move.getFrom(),
           this.getPlayer(),
         ).getRow() == 2
+        && RelativeCoordinates.fromCoordinates(
+          move.getTo(),
+          this.getPlayer(),
+        ).getRow() == 4
       )
         this.enPassePossible = true;
     }

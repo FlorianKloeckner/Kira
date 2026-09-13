@@ -116,6 +116,7 @@ export class King extends Piece {
 
   public doMove(move: Move): void {
     if (!this.canDoMove(move)) throw Error("Cannot do this move!");
+    this.hasMoved = true;
     if (move instanceof NormalMove) {
       this.getBoard().removePiece(move.getTo());
       this.coordinates = move.getTo();

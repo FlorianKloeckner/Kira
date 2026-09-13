@@ -34,6 +34,8 @@ export abstract class Piece {
 
   public abstract doMove(move: Move): void;
 
+  public resetEnPassePossible(): void {}
+
   public abstract getPossibleMoves(): Move[];
 
   public abstract getPieceType(): PieceType;
