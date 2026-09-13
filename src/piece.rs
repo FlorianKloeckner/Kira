@@ -72,7 +72,6 @@ impl fmt::Display for Piece {
             Piece::WPawn  => '♟',
         };
 
-        write!(f, "{}", symbol);
-        Ok(())//this seems wrong
+        write!(f, "{}", symbol)
     }
 }

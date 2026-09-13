@@ -82,13 +82,13 @@ impl Board {
             MoveType::CastleKingside => {
                 self.pieces[to ] = piece;
                 self.pieces[from ] = Piece::Empty;
-                self.pieces[(from+1) ] = self.pieces[(to +1) ];
-                self.pieces[(to + 1) ] = Piece::Empty;}
+                self.pieces[from+1] = self.pieces[to +1];
+                self.pieces[to + 1]  = Piece::Empty;}
             MoveType::CastleQueenside => {
                 self.pieces[to ] = piece;
                 self.pieces[from ] = Piece::Empty;
-                self.pieces[(from -1) ] = self.pieces[(from-4) ];
-                self.pieces[(from -4)] = Piece::Empty;}
+                self.pieces[from -1] = self.pieces[from-4];
+                self.pieces[from -4] = Piece::Empty;}
             MoveType::Promotion(promotion_piece) => {
                 self.pieces[to] = promotion_piece;
                 self.pieces[from] = Piece::Empty}
@@ -653,19 +653,18 @@ impl Board {
     fn is_in_check(&self, color: Color) -> bool {
         let king = color.king();
 
-        let mut king_square:u8 = 0;
         let opt_king_square = self
             .pieces
             .iter()
             .position(|&piece| piece == king);
-        match opt_king_square {
-            Some(k) => king_square = k as u8,
+        let king_square = match opt_king_square {
+            Some(k) => k as u8,
             None => {
                 eprintln!("Board must contain a king!");
                 eprintln!("current board: {}", self);
                 panic!()
             }
-        }
+        };
 
 
         let attacking_color = match color {
@@ -794,5 +793,12 @@ impl Board {
 
     pub fn add_current_position_to_history(&mut self){
         self.position_history_hashed.push(position_key::zobrist_hash(&self));
+    }
+
+    //returns true if the side currently to move is in checkmate
+
+    pub fn is_checkmate(&self) -> bool {
+        self.generate_possible_moves().len() == 0 
+        && self.is_in_check(self.side_to_move)
     }
 }

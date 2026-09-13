@@ -1,4 +1,3 @@
-use core::borrow;
 use std::env;
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,8 +5,7 @@ use rand::seq::IndexedRandom;
 use crate::piece::Piece;
 use crate::board::Board;
 
-use crate::requests::update_board;
-use crate::translate_move_uci::{uci_to_move, move_to_uci};
+use crate::translate_move_uci::{move_to_uci, square_to_algebraic, uci_to_move};
 mod requests;
 
 mod board;
@@ -23,15 +21,10 @@ pub mod piece;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
-    let opt_board = update_board(&mut board);
-    match opt_board {
-        Some(b) => board = b,
-        None => (),
-    }
+    
+    test_full_game_benjo_server();
 
-    eprintln!("{}", board);
-    eprintln!("Castling rights: {:?}{:?}{:?}{:?}", board.white_king_castling_possible, board.white_queen_castling_possible
-    ,board.black_king_castling_possible, board.black_queen_castling_possible);
+    //eprintln!("{}", board);
 
 
     println!("{:?}", args);
@@ -59,38 +52,29 @@ fn main() {
         println!("best move is: {}", move_to_uci(&best_move));
     }
     return;
-    loop {
-        let possible_moves = board.generate_possible_moves();
-        let ai_move = possible_moves.choose(&mut rand::rng());
-        let ai_move = ai_move.expect("AI lost, as it has no more moves");
-        let undo = board.make_move(ai_move);
-        board.unmake_move(ai_move, undo);
-        board.make_move(ai_move);
+}
 
-        println!("{}", move_to_uci(ai_move));
-        io::stdout().flush().expect("failed to flush move to gui"); // <-- without this, Python's readline() can hang forever
+fn test_full_game_benjo_server(){
 
-        let player_move: Move;
-        loop {
-            let opt_player_move = get_player_move_from_gui(&board);
-            
-            match opt_player_move {
-                Some(m) => {
-                    player_move = m;
-                    break;
-                }
-                None => (),
-            }
+    let res = square_to_algebraic(9);
+    eprintln!("{}, {}", res, res.to_ascii_uppercase());
+    let mut board = setup_board();
+    for _ in 0..20 {
+        let m = board.generate_possible_moves()[0];
+        let color_pass = match board.side_to_move {
+            Color::Black => "1234",
+            Color::White => "5678", //Why are they switched???
+        };
+        let _ = requests::send_move(m, color_pass);
+
+        board.make_move(&m);
+        eprintln!("{}", board);
+        eprintln!("made move: {}", move_to_uci(&m));
+        if board.is_checkmate() {
+            return
         }
-        eprintln!("converted extracted move: {player_move:?}");
-        let undo = board.make_move(&player_move);
-        board.unmake_move(&player_move, undo);
-        board.make_move(&player_move);
-        print_possible_engine_moves(&board);
-        eprintln!("Current board state [Kira] : ", );
-        eprintln!("{board}");
-
     }
+
 }
 
 
@@ -179,7 +163,7 @@ fn get_player_move() -> Move {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-enum Color {
+pub enum Color {
     White, 
     Black
 }
@@ -295,7 +279,7 @@ pub fn get_file(index: u8) -> u8{
 
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-struct Move {
+pub struct Move {
     from: u8, 
     to: u8,
     move_type: MoveType,

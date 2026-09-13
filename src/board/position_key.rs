@@ -1,4 +1,4 @@
-use crate::{Color, MoveType::EnPassant, board::Board, piece::Piece};
+use crate::{Color, board::Board, piece::Piece};
 pub fn zobrist_hash(board: &Board)  -> u64{
     //stolen from polyglot, to be able to easily use the opening books
     //also there was testing data, and I cannot say no to free tests
@@ -23,23 +23,23 @@ pub fn zobrist_hash(board: &Board)  -> u64{
         let row = crate::get_rank(i.try_into().unwrap());
         let file = crate::get_file(i.try_into().unwrap());
         let index = 64*kind_of_piece+8*(row as usize)+(file as usize);
-        piece = piece ^ Random64[index];
+        piece = piece ^ RANDOM64[index];
         
     }
 
     //zobrist castle
     let mut castle = 0;
     if board.white_king_castling_possible {
-        castle = castle^Random64[0+768];
+        castle = castle^RANDOM64[0+768];
     }
     if board.white_queen_castling_possible {
-        castle = castle ^ Random64[1+768];
+        castle = castle ^ RANDOM64[1+768];
     }
     if board.black_king_castling_possible {
-        castle = castle ^ Random64[2+768];
+        castle = castle ^ RANDOM64[2+768];
     }
     if board.black_queen_castling_possible {
-        castle = castle ^ Random64[3+768];
+        castle = castle ^ RANDOM64[3+768];
     }
 
     //zobrist enpassant
@@ -53,7 +53,7 @@ pub fn zobrist_hash(board: &Board)  -> u64{
             if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset) {
                 if board.pieces[target_square as usize] == board.side_to_move.pawn() {
                     let index = crate::get_file(square) as usize;
-                    en_passant = Random64[772 + index];
+                    en_passant = RANDOM64[772 + index];
                     break;
                 }
             }
@@ -63,7 +63,7 @@ pub fn zobrist_hash(board: &Board)  -> u64{
     //zobrist turn
     let mut turn = 0;
     if board.side_to_move == Color::White {
-        turn = Random64[780];
+        turn = RANDOM64[780];
     }
 
     let key = piece^castle^en_passant^turn;
@@ -74,7 +74,7 @@ pub fn zobrist_hash(board: &Board)  -> u64{
 
 
 
-const Random64: [u64; 781] = [
+const RANDOM64: [u64; 781] = [
    0x9D39247E33776D41, 0x2AF7398005AAA5C7, 0x44DB015024623547, 0x9C15F73E62A76AE2,
    0x75834465489C0C89, 0x3290AC3A203001BF, 0x0FBBAD1F61042279, 0xE83A908FF2FB60CA,
    0x0D7E765D58755C10, 0x1A083822CEAFE02D, 0x9605D5F0E25EC3B0, 0xD021FF5CD13A2ED5,

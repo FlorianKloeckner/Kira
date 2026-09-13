@@ -268,9 +268,9 @@ pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
             "to":&m.to
         }),
         _ => serde_json::json!({
-            "type": "NORMAL",
-            "from": square_to_algebraic(m.from),
-            "to": square_to_algebraic(m.to)
+            "type": "NORMAL_MOVE",
+            "from": square_to_algebraic(m.from).to_ascii_uppercase(),
+            "to": square_to_algebraic(m.to).to_ascii_uppercase()
         }),
     };
     let payload = serde_json::json!({
@@ -281,8 +281,8 @@ pub fn send_move(m: Move, color_pass: &str) -> Result<()>{
     let response = client
         .post(URL)
         .json(&payload)
-        .send();
+        .send()?;
 
-    eprintln!("{response}");
-    Ok(());
+    eprintln!("{:?}", response.text());
+    Ok(())
 }
