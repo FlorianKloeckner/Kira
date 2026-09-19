@@ -18,15 +18,18 @@ pub mod piece;
 //TODO load_fen
 //TODO fuck 50-Move rule, we dont fucking care
 
+const ENGINE_NAME:&str = "Kira V0.1";
+const AUTHOR_NAME:&str = "Dudelord";
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
     
-    test_full_game_benjo_server();
-
-    //eprintln!("{}", board);
-
+    if args.len() < 2 {
+        uci();
+        return;
+    }
 
     println!("{:?}", args);
     if args[1] == "perft" {
@@ -53,6 +56,32 @@ fn main() {
         println!("best move is: {}", move_to_uci(&best_move));
     }
     return;
+}
+
+fn uci(){
+    loop {
+        //Phase 1: Wait for input
+        let mut full_command = String::new(); 
+        io::stdin()
+            .read_line(&mut full_command)
+            .expect("failed to read uci move");
+        let mut command_words = full_command.split(" ");
+        let first_command = command_words.next().unwrap().trim();
+        match first_command{
+            "uci" => eprintln!("id name {}\nid author {}\nuciok", ENGINE_NAME, AUTHOR_NAME),
+            "isready" => eprintln!("readyok"),
+            "ucinewgame" => (),//dont really need to do things, as we are stateless rn
+            "position" => uci_parse_position_string(&full_command),
+            "quit" => return,
+            _ => (),
+        }
+    }
+    
+    //Phase 2: match input and 
+}
+
+fn uci_parse_position_string(full_command: &str){
+    //TODO
 }
 
 fn test_full_game_benjo_server() -> Option<()>{
