@@ -62,6 +62,7 @@ fn uci(){
     loop {
         //Phase 1: Wait for input
         let mut full_command = String::new(); 
+        let mut board= setup_board();
         io::stdin()
             .read_line(&mut full_command)
             .expect("failed to read uci move");
@@ -70,8 +71,8 @@ fn uci(){
         match first_command{
             "uci" => eprintln!("id name {}\nid author {}\nuciok", ENGINE_NAME, AUTHOR_NAME),
             "isready" => eprintln!("readyok"),
-            "ucinewgame" => (),//dont really need to do things, as we are stateless rn
-            "position" => uci_parse_position_string(&full_command),
+            "ucinewgame" => board = setup_board(),//dont really need to do things, as we are stateless rn
+            "position" => board = uci_parse_position_string(&full_command),
             "quit" => return,
             _ => (),
         }
@@ -80,8 +81,39 @@ fn uci(){
     //Phase 2: match input and 
 }
 
-fn uci_parse_position_string(full_command: &str){
+fn uci_parse_position_string(full_command: &str) -> Board{
     //TODO
+    let mut board = setup_board();
+    let args: Vec<&str> = full_command.split(" ").collect();
+    let second = args[1];
+    match second.trim() {
+        "startpos" => {
+            match args.get(2){
+                None => (),
+                Some(_) => make_uci_moves(&args[3..], &mut board),
+            }
+        },
+        "fen" => {
+            let fen = args[2..8].join(" ");
+            board = load_fen(&fen).unwrap();
+            match args.get(8){
+                None => (),
+                Some(_) => make_uci_moves(&args[9..], &mut board),
+            }
+        }
+        _ => panic!("second argument has to be [startpos|fen]"),
+    }
+    println!("successfully setup board");
+    println!("{board}");
+    board
+}
+
+fn make_uci_moves(moves: &[&str], board: &mut Board){
+    println!("DEBUG: moves: {moves:#?}");
+    for m in moves{
+        let board_move = uci_to_move(m.trim(), board).expect("could not parse move {m}");
+        board.make_move(&board_move);
+    }
 }
 
 fn test_full_game_benjo_server() -> Option<()>{
