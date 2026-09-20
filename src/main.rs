@@ -59,10 +59,11 @@ fn main() {
 }
 
 fn uci(){
+    let mut board= setup_board();
     loop {
         //Phase 1: Wait for input
         let mut full_command = String::new(); 
-        let mut board= setup_board();
+        
         io::stdin()
             .read_line(&mut full_command)
             .expect("failed to read uci move");
@@ -73,12 +74,29 @@ fn uci(){
             "isready" => eprintln!("readyok"),
             "ucinewgame" => board = setup_board(),//dont really need to do things, as we are stateless rn
             "position" => board = uci_parse_position_string(&full_command),
+            "go" => uci_parse_go_string(&full_command, &mut board),
             "quit" => return,
             _ => (),
         }
     }
     
     //Phase 2: match input and 
+}
+
+fn uci_parse_go_string(full_command: &str, b: &mut Board) {
+    //go depth N
+    //go movetime N
+    //go nodes N
+    //go wtime N btime N winc N binc N
+    let args: Vec<&str> = full_command.split(" ").collect();
+    let best_move = match args[1].trim(){
+        "depth" => b.search(args[2].trim().parse().unwrap()),
+        "movetime" => b.search(4),
+        "nodes" => b.search(4),
+        "wtime" => b.search(4),
+        _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
+    };
+    eprintln!("bestmove {}", move_to_uci(&best_move));
 }
 
 fn uci_parse_position_string(full_command: &str) -> Board{

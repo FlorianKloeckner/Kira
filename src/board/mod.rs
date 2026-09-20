@@ -758,12 +758,15 @@ impl Board {
     }
 
     pub fn search(&mut self, depth: usize) -> Move{
+
+        println!("info: now searching for best move with depth {depth}, side to move is {:?}", self.side_to_move);
+        println!("board is: {}", self);
         let possible_moves = self.generate_possible_moves();
         let mut best_move: Move = possible_moves[0];
         let mut max = -10000;
         for m in possible_moves.iter() {
             let undo = self.make_move(m);
-            let score = self.nega_max(depth, -10000, 10000);
+            let score = -self.nega_max(depth-1, -10000, -max);
             if score > max {
                 max = score;
                 best_move = m.clone();
@@ -775,20 +778,24 @@ impl Board {
     }
 
     fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
-        if depth == 0 {return self.evaluate()}
-        let score = -10000;
+        if depth == 0 {
+            return self.evaluate()
+        }
+        let mut best_score = -10000000;
         for m in self.generate_possible_moves().iter(){
             let undo = self.make_move(m);
-            let mut score = -10000000;
-            score = Ord::max(-self.nega_max(depth-1, -beta, -alpha), 
-                score);
-            alpha = Ord::max(alpha, score);
+            let score = -self.nega_max(depth-1, -beta, -alpha);
+                
+            self.unmake_move(m, undo);
+
+            best_score = best_score.max(score);
+            alpha = alpha.max(score);
+
             if alpha >= beta {
                 break;
             }
-            self.unmake_move(m, undo);
         }
-        score
+        best_score
     }
 
     pub fn add_current_position_to_history(&mut self){
