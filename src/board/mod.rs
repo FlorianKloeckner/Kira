@@ -1,6 +1,9 @@
 
 use core::panic;
 use std::fmt;
+use std::time::Instant;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 use crate::piece::Piece;
 use crate::Move;
 use crate::Color;
@@ -761,6 +764,7 @@ impl Board {
 
         println!("info: now searching for best move with depth {depth}, side to move is {:?}", self.side_to_move);
         println!("board is: {}", self);
+        let time_before = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         let possible_moves = self.generate_possible_moves();
         let mut best_move: Move = possible_moves[0];
         let mut max = -10000;
@@ -774,6 +778,9 @@ impl Board {
             self.unmake_move(m, undo);
 
         }
+        let time_after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+        println!("search took {:?}", time_after-time_before);
         best_move
     }
 
@@ -782,7 +789,7 @@ impl Board {
             return 0; //meh outcome, there is more to be had :[
         }
         if self.is_checkmate(){
-            return 10000000; //good outcome, we like this :]
+            return -10000000; //good outcome, the opponent hates this  :]
         }
         
         if depth == 0 {
