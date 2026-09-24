@@ -778,6 +778,13 @@ impl Board {
     }
 
     fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
+        if self.is_draw() {
+            return 0; //meh outcome, there is more to be had :[
+        }
+        if self.is_checkmate(){
+            return 10000000; //good outcome, we like this :]
+        }
+        
         if depth == 0 {
             return self.evaluate()
         }
