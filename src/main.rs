@@ -52,11 +52,11 @@ fn main() {
         println!("{res}");
         let zobrist =  board::position_key::zobrist_hash(&res);
         println!("zobrist key: {:#x}", zobrist);
-        let best_move = res.search(4);
+        let best_move = res.search(4, false);
         println!("best move is: {}", move_to_uci(&best_move));
     }
     else if args[1]  == "search" {
-        let bestmove = board.search(args[2].parse().expect(""));
+        let bestmove = board.search(args[2].parse().expect(""), false);
         println!("bestmove: {:?}", bestmove);
     }
     return;
