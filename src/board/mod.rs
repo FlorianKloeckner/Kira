@@ -174,34 +174,34 @@ impl Board {
                 Color::White => {
                     match piece {
                         Piece::WKing => 
-                            possible_moves.append(&mut self.generate_king_moves(square)),
+                            self.generate_king_moves(square, &mut possible_moves),
                         Piece::WQueen => 
-                            possible_moves.append(&mut self.generate_queen_moves(square)),
+                            self.generate_queen_moves(square, &mut possible_moves),
                         Piece::WBishop =>
-                            possible_moves.append(&mut self.generate_bishop_moves(square)), 
+                            self.generate_bishop_moves(square, &mut possible_moves), 
                         Piece::WKnight => 
-                            possible_moves.append(&mut self.generate_knight_moves(square)),
+                            self.generate_knight_moves(square, &mut possible_moves),
                         Piece::WRook => 
-                            possible_moves.append(&mut self.generate_rook_moves(square)),
+                            self.generate_rook_moves(square, &mut possible_moves),
                         Piece::WPawn =>
-                            possible_moves.append(&mut self.generate_pawn_moves(square)),
+                            self.generate_pawn_moves(square, &mut possible_moves),
                         _ => continue
                     }
                 }
                 Color::Black => {
                     match piece {
                         Piece::BKing => 
-                            possible_moves.append(&mut self.generate_king_moves(square)),
+                            self.generate_king_moves(square, &mut possible_moves),
                         Piece::BQueen => 
-                            possible_moves.append(&mut self.generate_queen_moves(square)),
+                            self.generate_queen_moves(square, &mut possible_moves),
                         Piece::BBishop =>
-                            possible_moves.append(&mut self.generate_bishop_moves(square)), 
+                            self.generate_bishop_moves(square, &mut possible_moves), 
                         Piece::BKnight => 
-                            possible_moves.append(&mut self.generate_knight_moves(square)),
+                            self.generate_knight_moves(square, &mut possible_moves),
                         Piece::BRook => 
-                            possible_moves.append(&mut self.generate_rook_moves(square)),
+                            self.generate_rook_moves(square, &mut possible_moves),
                         Piece::BPawn =>
-                            possible_moves.append(&mut self.generate_pawn_moves(square)),
+                            self.generate_pawn_moves(square, &mut possible_moves),
                         _ => continue
                     }
                 }
@@ -225,51 +225,41 @@ impl Board {
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
             let color = self.side_to_move;
-            match color {
-                Color::White => {
-                    match piece {
-                        Piece::WKing => 
-                            if !self.generate_king_moves(square).is_empty() {return true;}
-                        Piece::WQueen => 
-                            if !self.generate_queen_moves(square).is_empty() {return true;},
-                        Piece::WBishop =>
-                            if !self.generate_bishop_moves(square).is_empty() {return true;}, 
-                        Piece::WKnight => 
-                            if !self.generate_knight_moves(square).is_empty() {return true;}
-                        Piece::WRook => 
-                            if !self.generate_rook_moves(square).is_empty() {return true;}
-                        Piece::WPawn =>
-                            if !self.generate_pawn_moves(square).is_empty() {return true;}
-                        _ => continue
-                    }
-                }
-                Color::Black => {
-                    match piece {
-                        Piece::BKing => 
-                            if !self.generate_king_moves(square).is_empty() {return true;}
-                        Piece::BQueen => 
-                            if !self.generate_queen_moves(square).is_empty() {return true;},
-                        Piece::BBishop =>
-                            if !self.generate_bishop_moves(square).is_empty() {return true;}, 
-                        Piece::BKnight => 
-                            if !self.generate_knight_moves(square).is_empty() {return true;}
-                        Piece::BRook => 
-                            if !self.generate_rook_moves(square).is_empty() {return true;}
-                        Piece::BPawn =>
-                            if !self.generate_pawn_moves(square).is_empty() {return true;}
-                        _ => continue
-                    }
-                }
-                
+            let mut possible_moves: Vec<Move> = Vec::new();
 
+            match piece {
+                Piece::WKing|Piece::BKing => {
+                    self.generate_king_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                Piece::WQueen|Piece::BQueen => {
+                    self.generate_queen_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                Piece::WBishop|Piece::BBishop =>{
+                    self.generate_bishop_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                Piece::WKnight|Piece::BKnight => {
+                    self.generate_knight_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                Piece::WRook|Piece::BRook => {
+                    self.generate_rook_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                Piece::WPawn|Piece::BPawn =>{
+                    self.generate_pawn_moves(square, &mut possible_moves);
+                    if !possible_moves.is_empty() {return true;}
+                }
+                _ => continue
             }
         }
         return false
     }
     
 
-    fn generate_pawn_moves(&self, square: u8) -> Vec<Move>{
-        let mut possible_moves = Vec::new();
+    fn generate_pawn_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
 
         let pawn_rank_direction = match self.side_to_move {
             Color::White => 1,
@@ -280,7 +270,7 @@ impl Board {
             offset_square(square, 0, pawn_rank_direction) {
             if self.pieces[pawn_square as usize] == Piece::Empty {
                 if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
-                    possible_moves = self._generate_promotion_moves(square, pawn_square, possible_moves);
+                    self._generate_promotion_moves(square, pawn_square, possible_moves);
                 }
                 else {
                     possible_moves.push(Move {
@@ -315,7 +305,7 @@ impl Board {
                 offset_square(square, file_offset, pawn_rank_direction){
                     if self.pieces[pawn_square as usize].color() == Some(self.side_to_move.invert()) {
                         if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
-                                possible_moves = self._generate_promotion_moves(square, pawn_square, possible_moves);
+                                self._generate_promotion_moves(square, pawn_square, possible_moves);
                         }
                         else {
                             possible_moves.push(Move {
@@ -340,9 +330,8 @@ impl Board {
 
         }
             
-        possible_moves
     }
-    fn _generate_promotion_moves(&self, square: u8, pawn_square: u8, mut possible_moves: Vec<Move>) -> Vec<Move> {
+    fn _generate_promotion_moves(&self, square: u8, pawn_square: u8, possible_moves: &mut Vec<Move>){
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
@@ -364,10 +353,9 @@ impl Board {
             move_type: MoveType::Promotion(self.side_to_move.queen())
         });
         
-        possible_moves
     }
 
-    fn generate_knight_moves(&self, square: u8) -> Vec<Move> {
+    fn generate_knight_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
         const KNIGHT_OFFSETS: [(i8, i8); 8] = [
             (1, 2),
             (2, 1),
@@ -379,8 +367,6 @@ impl Board {
             (-1, 2),
         ];
 
-        let mut possible_moves = Vec::new();
-        
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
             if let Some(destination) = offset_square(square, file_offset, rank_offset) {
                 if self.pieces[destination as usize].color() != Some(self.side_to_move) {
@@ -393,11 +379,9 @@ impl Board {
             }
             
         }
-        possible_moves
     }
 
-    fn generate_bishop_moves(&self, square: u8) -> Vec<Move>{
-        let mut possible_moves = Vec::new();
+    fn generate_bishop_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
         const BISHOP_DIRECTIONS: [(i8, i8); 4] = [
             (1, 1),
             (1, -1),
@@ -429,11 +413,9 @@ impl Board {
                 }
             }
         }
-        possible_moves
     }
 
-    fn generate_rook_moves(&self, square: u8) -> Vec<Move> {
-        let mut possible_moves = Vec::new();
+    fn generate_rook_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
 
         const ROOK_DIRECTIONS: [(i8, i8); 4] = [
             (1, 0),
@@ -467,12 +449,10 @@ impl Board {
                 }
             }
         }
-        possible_moves
 
     }
 
-    fn generate_king_moves(&self, square: u8) -> Vec<Move>{
-        let mut possible_moves = Vec::new();
+    fn generate_king_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
         const KING_OFFSETS: [(i8, i8); 8] = [
             (1, 0),
             (1, 1),
@@ -557,16 +537,13 @@ impl Board {
                     }
             }
         }
-        
-        possible_moves
     }
 
-    fn generate_queen_moves(&self, square: u8) -> Vec<Move>{
+    fn generate_queen_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
         let mut possible_moves = Vec::new();
-        possible_moves.append(&mut self.generate_bishop_moves(square));
-        possible_moves.append(&mut self.generate_rook_moves(square));
+        self.generate_bishop_moves(square, &mut possible_moves);
+        self.generate_rook_moves(square, &mut possible_moves);
 
-        possible_moves
 
     }
 
