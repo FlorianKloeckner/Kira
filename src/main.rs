@@ -55,6 +55,10 @@ fn main() {
         let best_move = res.search(4);
         println!("best move is: {}", move_to_uci(&best_move));
     }
+    else if args[1]  == "search" {
+        let bestmove = board.search(args[2].parse().expect(""));
+        println!("bestmove: {:?}", bestmove);
+    }
     return;
 }
 
@@ -76,7 +80,7 @@ fn uci(){
             "position" => board = uci_parse_position_string(&full_command),
             "go" => uci_parse_go_string(&full_command, &mut board),
             "quit" => return,
-            _ => (),
+            _ => println!("That is not a valid command!"),
         }
     }
     
@@ -90,10 +94,10 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     //go wtime N btime N winc N binc N
     let args: Vec<&str> = full_command.split(" ").collect();
     let best_move = match args[1].trim(){
-        "depth" => b.search(args[2].trim().parse().unwrap()),
-        "movetime" => b.search(4),
-        "nodes" => b.search(4),
-        "wtime" => b.search(4),
+        "depth" => b.search(args[2].trim().parse().unwrap(), false),
+        "movetime" => b.search(5, true),
+        "nodes" => b.search(5, true),
+        "wtime" => b.search(5, true),
         _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
     };
     eprintln!("bestmove {}", move_to_uci(&best_move));

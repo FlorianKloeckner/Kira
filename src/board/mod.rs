@@ -1,6 +1,8 @@
 
 use core::panic;
 use std::fmt;
+use std::thread::current;
+use std::time::Duration;
 use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -46,8 +48,9 @@ impl fmt::Display for Board {
 }
 
 impl Board {
+        
+    const INF:isize = 100_000;
     pub fn make_move(&mut self, m: &Move) -> Undo{
-        //TODO
 
         let captured_piece = match m.move_type {
             MoveType::EnPassant => {
@@ -106,7 +109,7 @@ impl Board {
         }
         if m.move_type != MoveType::PawnDoubleStep {self.en_passant_target_square = None;}
         self.set_castling_rights(m); 
-        self.add_current_position_to_history();
+        //self.add_current_position_to_history();
         self.side_to_move = self.side_to_move.invert();
         undo
 
@@ -158,7 +161,7 @@ impl Board {
                 self.pieces[from -1] = Piece::Empty;
             }
         }
-        self.position_history_hashed.pop();
+        //self.position_history_hashed.pop();
     }
  
 
@@ -208,7 +211,7 @@ impl Board {
         }
 
         let mut legal_moves = Vec::new();
-        
+        //test pseudo-move to see if it is check
         for m in possible_moves {
             let mut test_board = self.clone();
             test_board.make_move(&m);
@@ -218,6 +221,52 @@ impl Board {
         }
         legal_moves
     }
+    fn has_move(&self) -> bool {
+        for (i, piece) in self.pieces.iter().enumerate() {
+            let square: u8 = i.try_into().unwrap();
+            let color = self.side_to_move;
+            match color {
+                Color::White => {
+                    match piece {
+                        Piece::WKing => 
+                            if !self.generate_king_moves(square).is_empty() {return true;}
+                        Piece::WQueen => 
+                            if !self.generate_queen_moves(square).is_empty() {return true;},
+                        Piece::WBishop =>
+                            if !self.generate_bishop_moves(square).is_empty() {return true;}, 
+                        Piece::WKnight => 
+                            if !self.generate_knight_moves(square).is_empty() {return true;}
+                        Piece::WRook => 
+                            if !self.generate_rook_moves(square).is_empty() {return true;}
+                        Piece::WPawn =>
+                            if !self.generate_pawn_moves(square).is_empty() {return true;}
+                        _ => continue
+                    }
+                }
+                Color::Black => {
+                    match piece {
+                        Piece::BKing => 
+                            if !self.generate_king_moves(square).is_empty() {return true;}
+                        Piece::BQueen => 
+                            if !self.generate_queen_moves(square).is_empty() {return true;},
+                        Piece::BBishop =>
+                            if !self.generate_bishop_moves(square).is_empty() {return true;}, 
+                        Piece::BKnight => 
+                            if !self.generate_knight_moves(square).is_empty() {return true;}
+                        Piece::BRook => 
+                            if !self.generate_rook_moves(square).is_empty() {return true;}
+                        Piece::BPawn =>
+                            if !self.generate_pawn_moves(square).is_empty() {return true;}
+                        _ => continue
+                    }
+                }
+                
+
+            }
+        }
+        return false
+    }
+    
 
     fn generate_pawn_moves(&self, square: u8) -> Vec<Move>{
         let mut possible_moves = Vec::new();
@@ -760,24 +809,52 @@ impl Board {
         score * self.side_to_move.value()
     }
 
-    pub fn search(&mut self, depth: usize) -> Move{
+    pub fn search(&mut self, depth: usize, adaptive_depth_allowed: bool) -> Move{
+        let mut adaptive_depth = depth;
 
         println!("info: now searching for best move with depth {depth}, side to move is {:?}", self.side_to_move);
-        println!("board is: {}", self);
+        println!("board is: \n{}", self);
         let time_before = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let possible_moves = self.generate_possible_moves();
+        let mut possible_moves = self.generate_possible_moves();
         let mut best_move: Move = possible_moves[0];
-        let mut max = -10000;
-        for m in possible_moves.iter() {
-            let undo = self.make_move(m);
-            let score = -self.nega_max(depth-1, -10000, -max);
-            if score > max {
-                max = score;
-                best_move = m.clone();
-            }
-            self.unmake_move(m, undo);
+        let mut current_depth = 1;
 
+        //iterative deepening
+        loop {
+            current_depth += 1;
+            
+            if current_depth > adaptive_depth {
+                break;
+            } 
+            let mut alpha:isize = -Board::INF;
+            let beta:isize = Board::INF;
+
+            let mut current_best_move = possible_moves[0];
+            let mut current_best_move_idx = 0;
+
+            for (j,m) in possible_moves.iter().enumerate() {
+                let undo = self.make_move(m);
+                let score = -self.nega_max(current_depth-1, -beta, -alpha);
+                if score > alpha {
+                    alpha = score;
+                    current_best_move = *m;
+                    current_best_move_idx = j;
+                }
+                self.unmake_move(m, undo);
+
+            }
+            possible_moves.swap(0, current_best_move_idx); //ordering after the best move
+            best_move = current_best_move;
+            let time_after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            let time_taken = time_after - time_before;
+            println!("completed search with depth {}, score {}, in {:?}", current_depth, alpha, time_taken);
+
+            if adaptive_depth_allowed && current_depth == adaptive_depth && time_taken < Duration::from_millis(50) {
+                adaptive_depth = adaptive_depth +1;
+            }
+            
         }
+        
         let time_after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
         println!("search took {:?}", time_after-time_before);
@@ -789,13 +866,14 @@ impl Board {
             return 0; //meh outcome, there is more to be had :[
         }
         if self.is_checkmate(){
-            return -10000000; //good outcome, the opponent hates this  :]
+            println!("detected checkmate");
+            return -Board::INF; //good outcome, the opponent hates this  :]
         }
         
         if depth == 0 {
-            return self.evaluate()
+            return self.quiesce_search(-alpha, -beta)
         }
-        let mut best_score = -10000000;
+        let mut best_score = -Board::INF; //mistake here likely
         for m in self.generate_possible_moves().iter(){
             let undo = self.make_move(m);
             let score = -self.nega_max(depth-1, -beta, -alpha);
@@ -803,6 +881,7 @@ impl Board {
             self.unmake_move(m, undo);
 
             best_score = best_score.max(score);
+            //println!("score is : {score}, best score is {best_score}");
             alpha = alpha.max(score);
 
             if alpha >= beta {
@@ -812,6 +891,43 @@ impl Board {
         best_score
     }
 
+    pub fn quiesce_search(&mut self, mut alpha: isize, mut beta: isize) -> isize{
+        let static_eval = self.evaluate();
+
+        let mut best_value = static_eval;
+
+        if best_value >= beta {
+            return best_value;
+        }
+        if best_value > alpha {
+            alpha = best_value;
+        }
+
+        let mut possible_moves = self.generate_possible_moves();
+        while possible_moves.len() != 0 {
+            let current_move = possible_moves.pop().expect("possible moves cannot be empty here");
+            if self.pieces[current_move.to as usize] == Piece::Empty {continue}
+            //move is capturing move
+
+            let undo = self.make_move(&current_move);
+            let score = -self.quiesce_search(-beta, -alpha);
+            self.unmake_move(&current_move, undo);
+
+            if score >= beta {
+                return score;
+            }
+            if score > best_value {
+                best_value = score;
+            }
+            if score >= alpha {
+                alpha = score;
+            }
+
+        }
+
+        return best_value
+    }
+
     pub fn add_current_position_to_history(&mut self){
         self.position_history_hashed.push(position_key::zobrist_hash(&self));
     }
@@ -819,8 +935,7 @@ impl Board {
     //returns true if the side currently to move is in checkmate
 
     pub fn is_checkmate(&self) -> bool {
-        self.generate_possible_moves().len() == 0 
-        && self.is_in_check(self.side_to_move)
+        self.is_in_check(self.side_to_move) && !self.has_move()
     }
 
     pub fn is_draw(&self) -> bool {

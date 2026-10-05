@@ -20,8 +20,9 @@ pub fn zobrist_hash(board: &Board)  -> u64{
             Piece::BKing => 10,
             Piece::WKing => 11,
         };
-        let row = crate::get_rank(i.try_into().unwrap());
-        let file = crate::get_file(i.try_into().unwrap());
+        let square:u8 = i.try_into().unwrap();
+        let row = crate::get_rank(square);
+        let file = crate::get_file(square);
         let index = 64*kind_of_piece+8*(row as usize)+(file as usize);
         piece = piece ^ RANDOM64[index];
         
