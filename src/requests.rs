@@ -1,18 +1,17 @@
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use serde_json::Value;
-use core::error;
-use std::{collections::HashMap, io::Read};
+use std::collections::HashMap;
 
-use crate::{Color, Move, MoveType, board::Board, offset_square, piece::Piece, requests, translate_move_uci::{self, square_to_algebraic}};
+use crate::{Color, Move, MoveType, board::Board, offset_square, piece::Piece, translate_move_uci::{self, square_to_algebraic}};
 
 const URL:&str = "http://localhost:12345";
 
 
-pub fn update_board(board: &mut Board) -> Option<Board>{
+pub fn update_board(_board: &mut Board) -> Option<Board>{
     //get board gets almost everything, we just want to keep the old position history 
     //and add the current positon on it
-    let mut new_board = get_board()?;
+    let new_board = get_board()?;
     //new_board.position_history_hashed = board.position_history_hashed.clone();
     //new_board.add_current_position_to_history();
 
@@ -73,7 +72,7 @@ fn get_board() -> Option<Board> {
                 eprintln!("Could not deserialize player from json");
                 None
             })?;
-        let piece = piece_name_color_to_piece(&piece_type, &piece_color)
+        let piece = piece_name_color_to_piece(piece_type, piece_color)
             .or_else(|| {
                 eprintln!("Could not get piece from color {piece_color} and type: {piece_type}");
                 None
@@ -101,27 +100,27 @@ fn get_board() -> Option<Board> {
     let mut black_queen_castling_possible = false;
     let mut black_king_castling_possible = false;
 
-    if !has_piece_on_square_moved(&json_pieces, "a1") &&
-        !has_piece_on_square_moved(&json_pieces, "e1") &&
+    if !has_piece_on_square_moved(json_pieces, "a1") &&
+        !has_piece_on_square_moved(json_pieces, "e1") &&
         pieces[0] == Piece::WRook &&
         pieces[4] == Piece::WKing {
             white_queen_castling_possible = true;
         }
     
-    if !has_piece_on_square_moved(&json_pieces, "e1") &&
-        !has_piece_on_square_moved(&json_pieces, "h1") &&
+    if !has_piece_on_square_moved(json_pieces, "e1") &&
+        !has_piece_on_square_moved(json_pieces, "h1") &&
         pieces[4] == Piece::WKing &&
         pieces[7] == Piece::WRook{
             white_king_castling_possible = true;
         }
-    if !has_piece_on_square_moved(&json_pieces, "a8") &&
-        !has_piece_on_square_moved(&json_pieces, "e8") &&
+    if !has_piece_on_square_moved(json_pieces, "a8") &&
+        !has_piece_on_square_moved(json_pieces, "e8") &&
         pieces[56] == Piece::BRook &&
         pieces[60] == Piece::BKing{
             black_queen_castling_possible = true;
         }
-    if !has_piece_on_square_moved(&json_pieces, "e8") &&
-        !has_piece_on_square_moved(&json_pieces, "h8") &&
+    if !has_piece_on_square_moved(json_pieces, "e8") &&
+        !has_piece_on_square_moved(json_pieces, "h8") &&
         pieces[60] == Piece::BKing &&
         pieces[63] == Piece::BRook{
             black_king_castling_possible = true;
@@ -141,7 +140,7 @@ fn get_board() -> Option<Board> {
 } 
 //color is the color of the piece on square
 fn get_en_pass_target_square(square: u8, color: Color) -> u8{
-    offset_square(square, 0, (color.value()*-1) as i8).expect("could not offset square: {square} by rank: {color.value}")
+    offset_square(square, 0, -color.value() as i8).expect("could not offset square: {square} by rank: {color.value}")
 }
 
 fn has_piece_on_square_moved(pieces: &Vec<Value>, square: &str) -> bool{
@@ -187,10 +186,7 @@ fn is_server_online() -> bool {
     //send a simple request to the server and check if we get a response
     let client = reqwest::blocking::Client::new();
     let res = client.get(URL).send();
-    match res {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    res.is_ok()
 }
 
 //parses api response text into Board or returns null on error

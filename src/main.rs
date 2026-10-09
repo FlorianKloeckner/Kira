@@ -5,8 +5,7 @@ use rand::seq::{IndexedRandom};
 use crate::piece::Piece;
 use crate::board::Board;
 
-use crate::requests::update_board;
-use crate::translate_move_uci::{move_to_uci, square_to_algebraic, uci_to_move};
+use crate::translate_move_uci::{move_to_uci, uci_to_move};
 mod requests;
 
 mod board;
@@ -59,7 +58,6 @@ fn main() {
         let bestmove = board.search(args[2].parse().expect(""), false);
         println!("bestmove: {:?}", bestmove);
     }
-    return;
 }
 
 fn uci(){
@@ -286,7 +284,8 @@ impl Color {
 
 
 fn setup_board() -> Board{
-    let b = Board {
+    
+    Board {
         pieces: {
             let mut piece_arr: [Piece; 64] = {[Piece::Empty; 64]};
             piece_arr[0] = Piece::WRook;
@@ -320,17 +319,16 @@ fn setup_board() -> Board{
         white_queen_castling_possible: true,
         black_king_castling_possible: true,
         position_history_hashed: Vec::new(),
-    };
-    b
+    }
 }
 
 
 pub fn get_rank(index: u8) -> u8{
-    (index / 8) as u8
+    index / 8 
 }
 
 pub fn get_file(index: u8) -> u8{
-    (index % 8) as u8
+    index % 8 
 }
 
 
@@ -468,12 +466,12 @@ fn load_fen(fen: &str) -> Result<Board, String> {
         }
 
         let file = match bytes[0] {
-            b'a'..=b'h' => (bytes[0] - b'a') as u8,
+            b'a'..=b'h' => bytes[0] - b'a' ,
             _ => return Err("Invalid FEN: invalid en-passant file".to_string()),
         };
 
         let rank = match bytes[1] {
-            b'1'..=b'8' => (bytes[1] - b'1') as u8,
+            b'1'..=b'8' => bytes[1] - b'1' ,
             _ => return Err("Invalid FEN: invalid en-passant rank".to_string()),
         };
 

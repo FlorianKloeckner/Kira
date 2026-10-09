@@ -24,23 +24,23 @@ pub fn zobrist_hash(board: &Board)  -> u64{
         let row = crate::get_rank(square);
         let file = crate::get_file(square);
         let index = 64*kind_of_piece+8*(row as usize)+(file as usize);
-        piece = piece ^ RANDOM64[index];
+        piece ^= RANDOM64[index];
         
     }
 
     //zobrist castle
     let mut castle = 0;
     if board.white_king_castling_possible {
-        castle = castle^RANDOM64[0+768];
+        castle ^= RANDOM64[768];
     }
     if board.white_queen_castling_possible {
-        castle = castle ^ RANDOM64[1+768];
+        castle ^= RANDOM64[1+768];
     }
     if board.black_king_castling_possible {
-        castle = castle ^ RANDOM64[2+768];
+        castle ^= RANDOM64[2+768];
     }
     if board.black_queen_castling_possible {
-        castle = castle ^ RANDOM64[3+768];
+        castle ^= RANDOM64[3+768];
     }
 
     //zobrist enpassant
@@ -51,13 +51,12 @@ pub fn zobrist_hash(board: &Board)  -> u64{
                 Color::White => -1,
                 Color::Black => 1,
             };
-            if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset) {
-                if board.pieces[target_square as usize] == board.side_to_move.pawn() {
+            if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset)
+                && board.pieces[target_square as usize] == board.side_to_move.pawn() {
                     let index = crate::get_file(square) as usize;
                     en_passant = RANDOM64[772 + index];
                     break;
                 }
-            }
         }  
     }
 
@@ -67,8 +66,8 @@ pub fn zobrist_hash(board: &Board)  -> u64{
         turn = RANDOM64[780];
     }
 
-    let key = piece^castle^en_passant^turn;
-    key
+    
+    piece^castle^en_passant^turn
 
 }
 

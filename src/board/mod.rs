@@ -167,7 +167,7 @@ impl Board {
             _ => self.pieces[m.to as usize],
         };
         let undo = Undo {
-            captured_piece: captured_piece,
+            captured_piece,
             old_black_king_castling_possible: self.black_king_castling_possible,
             old_black_queen_castling_possible: self.black_queen_castling_possible,
             old_white_king_castling_possible: self.white_king_castling_possible,
@@ -359,7 +359,7 @@ impl Board {
                 _ => continue
             }
         }
-        return false
+        false
     }
     
 
@@ -371,8 +371,8 @@ impl Board {
         };
         //step by one
         if let Some(pawn_square) = 
-            offset_square(square, 0, pawn_rank_direction) {
-            if self.pieces[pawn_square as usize] == Piece::Empty {
+            offset_square(square, 0, pawn_rank_direction)
+            && self.pieces[pawn_square as usize] == Piece::Empty {
                 if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
                     self._generate_promotion_moves(square, pawn_square, possible_moves);
                 }
@@ -387,22 +387,18 @@ impl Board {
                 if get_rank(square) == match self.side_to_move {
                         Color::White => 1, 
                         Color::Black => 6
-                    }{
-                    if let Some(pawn_square) = 
-                        offset_square(square, 0, pawn_rank_direction*2) {
-                            if self.pieces[pawn_square as usize] == Piece::Empty {
+                    }
+                    && let Some(pawn_square) = 
+                        offset_square(square, 0, pawn_rank_direction*2)
+                            && self.pieces[pawn_square as usize] == Piece::Empty {
                                 possible_moves.push(Move {
                                     from: square,
                                     to: pawn_square,
                                     move_type: MoveType::PawnDoubleStep,
                                 });
                             }
-                        }
-                }
                 
-            } 
-            
-        }
+            }
         //captures
         for file_offset in [-1, 1] {
             if let Some(pawn_square) = 
@@ -420,15 +416,14 @@ impl Board {
                         }
                     }
                     //en passant
-                    if let Some(en_square) = self.en_passant_target_square {
-                        if pawn_square == en_square{
+                    if let Some(en_square) = self.en_passant_target_square
+                        && pawn_square == en_square{
                             possible_moves.push(Move{
                                 from: square,
                                 to: pawn_square,
                                 move_type: MoveType::EnPassant,
                             });
-                        }
-                    } 
+                        } 
                     
                 }
 
@@ -472,15 +467,14 @@ impl Board {
         ];
 
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
-            if let Some(destination) = offset_square(square, file_offset, rank_offset) {
-                if self.pieces[destination as usize].color() != Some(self.side_to_move) {
+            if let Some(destination) = offset_square(square, file_offset, rank_offset)
+                && self.pieces[destination as usize].color() != Some(self.side_to_move) {
                     possible_moves.push(Move {
                         from: square,
                         to: destination,
                         move_type: MoveType::Normal,
                     })
                 }
-            }
             
         }
     }
@@ -570,76 +564,64 @@ impl Board {
 
         for (file_offset, rank_offset) in KING_OFFSETS {
             if let Some(destination) = 
-                offset_square(square, file_offset, rank_offset) {
-                    if self.pieces[destination as usize].color() != Some(self.side_to_move) {
+                offset_square(square, file_offset, rank_offset)
+                    && self.pieces[destination as usize].color() != Some(self.side_to_move) {
                         possible_moves.push(Move {
                             from: square, 
                             to: destination,
                             move_type: MoveType::Normal,
                         });
                     }
-                }
         }
         //determine if castling is possible
         //castling is possible if king and rook have not been taken or been moved
         if self.side_to_move == Color::White {
-            if self.white_king_castling_possible {
-                if !self.is_square_attacked(5, Color::Black) &&
+            if self.white_king_castling_possible
+                && !self.is_square_attacked(5, Color::Black) &&
                     !self.is_square_attacked(6, Color::Black) &&
-                    !self.is_square_attacked(4, Color::Black){
-                        if self.pieces[5] == Piece::Empty && self.pieces[6] == Piece::Empty{
+                    !self.is_square_attacked(4, Color::Black)
+                        && self.pieces[5] == Piece::Empty && self.pieces[6] == Piece::Empty{
                             possible_moves.push(Move {
                                 from: 4,
                                 to: 6,
                                 move_type: MoveType::CastleKingside
                             });
-                        }   
-                    }
-            }
-            if self.white_queen_castling_possible {
-                if !self.is_square_attacked(2, Color::Black) &&
+                        }
+            if self.white_queen_castling_possible
+                && !self.is_square_attacked(2, Color::Black) &&
                     !self.is_square_attacked(3, Color::Black) &&
-                    !self.is_square_attacked(4, Color::Black) {
-                        if self.pieces[1] == Piece::Empty && self.pieces[2] == Piece::Empty && self.pieces[3] == Piece::Empty{
+                    !self.is_square_attacked(4, Color::Black)
+                        && self.pieces[1] == Piece::Empty && self.pieces[2] == Piece::Empty && self.pieces[3] == Piece::Empty{
                             possible_moves.push(Move {
                                 from: 4, 
                                 to: 2,
                                 move_type: MoveType::CastleQueenside
                             });
                         }
-                        
-                    }
-            }
         }
         else {
-            if self.black_king_castling_possible {
-                if !self.is_square_attacked(62, Color::White) &&
+            if self.black_king_castling_possible
+                && !self.is_square_attacked(62, Color::White) &&
                     !self.is_square_attacked(61, Color::White) &&
-                    !self.is_square_attacked(60, Color::White){
-                        if self.pieces[61] == Piece::Empty && self.pieces[62] == Piece::Empty{
+                    !self.is_square_attacked(60, Color::White)
+                        && self.pieces[61] == Piece::Empty && self.pieces[62] == Piece::Empty{
                             possible_moves.push(Move {
                             from: 60,
                             to: 62,
                             move_type: MoveType::CastleKingside
                             });
                         }
-                        
-                    }
-                
-            }
-            if self.black_queen_castling_possible {
-                if !self.is_square_attacked(58, Color::White) &&
+            if self.black_queen_castling_possible
+                && !self.is_square_attacked(58, Color::White) &&
                     !self.is_square_attacked(59, Color::White) &&
-                    !self.is_square_attacked(60, Color::White) {
-                        if self.pieces[59] == Piece::Empty && self.pieces[58] == Piece::Empty && self.pieces[57] == Piece::Empty{
+                    !self.is_square_attacked(60, Color::White)
+                        && self.pieces[59] == Piece::Empty && self.pieces[58] == Piece::Empty && self.pieces[57] == Piece::Empty{
                             possible_moves.push(Move {
                             from: 60, 
                             to: 58,
                             move_type: MoveType::CastleQueenside
                         });
                         }
-                    }
-            }
         }
     }
 
@@ -668,11 +650,9 @@ impl Board {
         for file_offset in [-1, 1] {
             if let Some(pawn_square) =
                 offset_square(square, file_offset, pawn_rank_direction)
-            {
-                if self.pieces[pawn_square as usize] == color.pawn() {
+                && self.pieces[pawn_square as usize] == color.pawn() {
                     return true;
                 }
-            }
         }
 
         // -------------------------------------------------
@@ -691,11 +671,10 @@ impl Board {
         ];
 
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
-            if let Some(source) = offset_square(square, file_offset, rank_offset) {
-                if self.pieces[source as usize] == color.knight() {
+            if let Some(source) = offset_square(square, file_offset, rank_offset)
+                && self.pieces[source as usize] == color.knight() {
                     return true;
                 }
-            }
         }
 
         // -------------------------------------------------
@@ -841,7 +820,7 @@ impl Board {
     }
 
     pub fn fen(&self) -> String {
-        let mut pieces = self.pieces.clone();
+        let mut pieces = self.pieces;
         pieces.reverse();
         let mut fen_string = String::new();
         let mut counter = 0;
@@ -952,7 +931,7 @@ impl Board {
             println!("completed search with depth {}, score {}, in {:?}", current_depth, alpha, time_taken);
 
             if adaptive_depth_allowed && current_depth == adaptive_depth && time_taken < Duration::from_millis(50) {
-                adaptive_depth = adaptive_depth +1;
+                adaptive_depth += 1;
             }
             
         }
