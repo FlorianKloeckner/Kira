@@ -1,9 +1,7 @@
 
 use core::panic;
 use std::fmt;
-use std::thread::current;
 use std::time::Duration;
-use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use crate::piece::Piece;
@@ -12,7 +10,6 @@ use crate::Color;
 use crate::MoveType;
 use crate::offset_square;
 use crate::get_rank;
-use rand::distr::slice::Empty;
 use undo::Undo;
 
 pub mod position_key;
@@ -332,7 +329,6 @@ impl Board {
     fn has_move(&self) -> bool {
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
-            let color = self.side_to_move;
             let mut possible_moves: Vec<Move> = Vec::new();
 
             match piece {
@@ -968,7 +964,7 @@ impl Board {
     }
 
     fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
-        let mut nodes = 0;
+        // let mut nodes = 0;
         if self.is_draw() {
             return 0; //meh outcome, there is more to be had :[
         }
@@ -1003,7 +999,7 @@ impl Board {
         best_score
     }
 
-    pub fn quiesce_search(&mut self, mut alpha: isize, mut beta: isize) -> isize {
+    pub fn quiesce_search(&mut self, mut alpha: isize, beta: isize) -> isize {
     let static_eval = self.evaluate();
 
     if static_eval >= beta {
