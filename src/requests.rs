@@ -13,8 +13,8 @@ pub fn update_board(board: &mut Board) -> Option<Board>{
     //get board gets almost everything, we just want to keep the old position history 
     //and add the current positon on it
     let mut new_board = get_board()?;
-    new_board.position_history_hashed = board.position_history_hashed.clone();
-    new_board.add_current_position_to_history();
+    //new_board.position_history_hashed = board.position_history_hashed.clone();
+    //new_board.add_current_position_to_history();
 
     Some(new_board)
     

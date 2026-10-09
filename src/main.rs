@@ -95,9 +95,9 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     let args: Vec<&str> = full_command.split(" ").collect();
     let best_move = match args[1].trim(){
         "depth" => b.search(args[2].trim().parse().unwrap(), false),
-        "movetime" => b.search(5, true),
-        "nodes" => b.search(5, true),
-        "wtime" => b.search(5, true),
+        "movetime" => b.search(4, true),
+        "nodes" => b.search(4, true),
+        "wtime" => b.search(4, true),
         _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
     };
     eprintln!("bestmove {}", move_to_uci(&best_move));

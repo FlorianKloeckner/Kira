@@ -12,10 +12,118 @@ use crate::Color;
 use crate::MoveType;
 use crate::offset_square;
 use crate::get_rank;
+use rand::distr::slice::Empty;
 use undo::Undo;
 
 pub mod position_key;
 mod undo;
+
+
+const fn flip(table: [isize; 64]) -> [isize; 64] {
+    let mut flipped = [0; 64];
+    let mut i = 0;
+    while i < 64 {
+        let rank = i / 8;
+        let file = i % 8;
+        let flipped_rank = 7 - rank;
+        flipped[flipped_rank * 8 + file] = table[i];
+        i += 1;
+    }
+    flipped
+}
+
+// PAWNS
+const W_PAWN_EVAL: [isize; 64] = [
+     0,  0,  0,  0,  0,  0,  0,  0,  
+     5, 10, 10,-20,-20, 10, 10,  5, 
+     5, -5,-10,  0,  0,-10, -5,  5, 
+     0,  0,  0, 20, 20,  0,  0,  0, 
+     5,  5, 10, 25, 25, 10,  5,  5, 
+    10, 10, 20, 30, 30, 20, 10, 10, 
+    50, 50, 50, 50, 50, 50, 50, 50, 
+     0,  0,  0,  0,  0,  0,  0,  0  
+];
+const B_PAWN_EVAL: [isize; 64] = flip(W_PAWN_EVAL);
+
+// KNIGHTS
+const W_KNIGHT_EVAL: [isize; 64] = [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50
+];
+const B_KNIGHT_EVAL: [isize; 64] = flip(W_KNIGHT_EVAL);
+
+// BISHOPS
+const W_BISHOP_EVAL: [isize; 64] = [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20
+];
+const B_BISHOP_EVAL: [isize; 64] = flip(W_BISHOP_EVAL);
+
+// ROOKS
+const W_ROOK_EVAL: [isize; 64] = [
+     0,  0,  0,  5,  5,  0,  0,  0,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+     5, 10, 10, 10, 10, 10, 10,  5,
+     0,  0,  0,  0,  0,  0,  0,  0
+];
+const B_ROOK_EVAL: [isize; 64] = flip(W_ROOK_EVAL);
+
+// QUEENS
+const W_QUEEN_EVAL: [isize; 64] = [
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+      0,  0,  5,  5,  5,  5,  0, -5,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20
+];
+const B_QUEEN_EVAL: [isize; 64] = flip(W_QUEEN_EVAL);
+
+// KING MIDDLEGAME
+const W_KING_MG_EVAL: [isize; 64] = [
+     20, 30, 10,  0,  0, 10, 30, 20, // Rank 1: Strongly favor G1/C1 for castling
+     20, 20,  0,  0,  0,  0, 20, 20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30
+];
+const B_KING_MG_EVAL: [isize; 64] = flip(W_KING_MG_EVAL);
+
+// KING ENDGAME
+const W_KING_EG_EVAL: [isize; 64] = [
+    -50,-30,-30,-30,-30,-30,-30,-50, // Rank 1: Penalize sitting on the back rank
+    -30,-30,  0,  0,  0,  0,-30,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-20,-10,  0,  0,-10,-20,-30,
+    -50,-40,-30,-20,-20,-30,-40,-50
+];
+const B_KING_EG_EVAL: [isize; 64] = flip(W_KING_EG_EVAL);
+
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Board {
     pub pieces: [Piece; 64], 
@@ -540,9 +648,8 @@ impl Board {
     }
 
     fn generate_queen_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
-        let mut possible_moves = Vec::new();
-        self.generate_bishop_moves(square, &mut possible_moves);
-        self.generate_rook_moves(square, &mut possible_moves);
+        self.generate_bishop_moves(square, possible_moves);
+        self.generate_rook_moves(square, possible_moves);
 
 
     }
@@ -780,10 +887,32 @@ impl Board {
 
     pub fn evaluate(&self) -> isize {
         let mut score = 0;
-        for p in self.pieces.iter() {
-            score += p.score();
+        let side_val = self.side_to_move.value();
+        if self.is_in_check(self.side_to_move){
+            score -= 30;
         }
-        score * self.side_to_move.value()
+        for (i,p) in self.pieces.iter().enumerate() {
+            score += p.score();
+            match p {
+                Piece::Empty => {continue},
+                Piece::WPawn => score += W_PAWN_EVAL[i],
+                Piece::BPawn => score -= B_PAWN_EVAL[i],
+                Piece::WKnight =>  score += W_KNIGHT_EVAL[i],
+                Piece::BKnight =>  score -= B_KNIGHT_EVAL[i],
+                Piece::WBishop =>  score += W_BISHOP_EVAL[i] ,
+                Piece::BBishop =>  score -= B_BISHOP_EVAL[i] ,
+                Piece::WRook =>  score += W_ROOK_EVAL[i],
+                Piece::BRook =>  score -= B_ROOK_EVAL[i],
+                Piece::WQueen =>  score += W_QUEEN_EVAL[i],
+                Piece::BQueen =>  score -= B_QUEEN_EVAL[i],
+                Piece::WKing =>  score += W_KING_MG_EVAL[i],
+                Piece::BKing =>  score -= B_KING_MG_EVAL[i] ,
+                
+            };
+            
+        }
+        
+        score * side_val
     }
 
     pub fn search(&mut self, depth: usize, adaptive_depth_allowed: bool) -> Move{
@@ -839,19 +968,25 @@ impl Board {
     }
 
     fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
+        let mut nodes = 0;
         if self.is_draw() {
             return 0; //meh outcome, there is more to be had :[
         }
-        if self.is_checkmate(){
-            println!("detected checkmate");
-            return -Board::INF; //good outcome, the opponent hates this  :]
-        }
         
         if depth == 0 {
-            return self.quiesce_search(-alpha, -beta)
+            return self.quiesce_search(alpha, beta)
         }
+
+        let possible_moves = self.generate_possible_moves();
+
+        if possible_moves.is_empty() {
+            if self.is_in_check(self.side_to_move){
+                return -Board::INF
+            }
+            return 0
+        }        
         let mut best_score = -Board::INF; //mistake here likely
-        for m in self.generate_possible_moves().iter(){
+        for m in possible_moves.iter(){
             let undo = self.make_move(m);
             let score = -self.nega_max(depth-1, -beta, -alpha);
                 
@@ -868,46 +1003,54 @@ impl Board {
         best_score
     }
 
-    pub fn quiesce_search(&mut self, mut alpha: isize, mut beta: isize) -> isize{
-        let static_eval = self.evaluate();
+    pub fn quiesce_search(&mut self, mut alpha: isize, mut beta: isize) -> isize {
+    let static_eval = self.evaluate();
 
-        let mut best_value = static_eval;
-
-        if best_value >= beta {
-            return best_value;
-        }
-        if best_value > alpha {
-            alpha = best_value;
-        }
-
-        let mut possible_moves = self.generate_possible_moves();
-        while possible_moves.len() != 0 {
-            let current_move = possible_moves.pop().expect("possible moves cannot be empty here");
-            if self.pieces[current_move.to as usize] == Piece::Empty {continue}
-            //move is capturing move
-
-            let undo = self.make_move(&current_move);
-            let score = -self.quiesce_search(-beta, -alpha);
-            self.unmake_move(&current_move, undo);
-
-            if score >= beta {
-                return score;
-            }
-            if score > best_value {
-                best_value = score;
-            }
-            if score >= alpha {
-                alpha = score;
-            }
-
-        }
-
-        return best_value
+    if static_eval >= beta {
+        return static_eval;
+    }
+    
+    let mut best_score = static_eval;
+    if static_eval > alpha {
+        alpha = static_eval;
     }
 
-    pub fn add_current_position_to_history(&mut self){
-        self.position_history_hashed.push(position_key::zobrist_hash(&self));
+    let possible_moves = self.generate_possible_moves();
+    
+    let mut captures: Vec<Move> = possible_moves.into_iter().filter(|m| {
+        self.pieces[m.to as usize] != Piece::Empty || m.move_type == MoveType::EnPassant
+    }).collect();
+
+    captures.sort_by_key(|m| {
+        let attacker_val = self.pieces[m.from as usize].base_value();
+        let victim_val = if m.move_type == MoveType::EnPassant {
+            100 
+        } else {
+            self.pieces[m.to as usize].base_value()
+        };
+        (10 * victim_val) - attacker_val
+    });
+
+    while let Some(current_move) = captures.pop() {
+        let undo = self.make_move(&current_move);
+        let score = -self.quiesce_search(-beta, -alpha);
+        self.unmake_move(&current_move, undo);
+
+        // FIX: Update best_score!
+        if score > best_score {
+            best_score = score;
+        }
+        if score >= beta {
+            return score; // Fail-high
+        }
+        if score > alpha {
+            alpha = score;
+        }
     }
+
+    // FIX: Return best_score, never just raw alpha!
+    best_score
+}
 
     //returns true if the side currently to move is in checkmate
 

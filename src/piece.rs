@@ -29,14 +29,28 @@ impl Piece {
     pub fn score(&self) -> isize {
         match self {
             Piece::Empty|Piece::WKing|Piece::BKing => 0, 
-            Piece::WPawn => 1, 
-            Piece::WBishop|Piece::WKnight => 3,
-            Piece::WRook => 5,
-            Piece::WQueen => 9,
-            Piece::BPawn => -1, 
-            Piece::BBishop|Piece::BKnight => -3, 
-            Piece::BRook => -5,
-            Piece::BQueen => -9,  
+            Piece::WPawn => 100, 
+            Piece::WBishop|Piece::WKnight => 300,
+            Piece::WRook => 500,
+            Piece::WQueen => 900,
+            Piece::BPawn => -100, 
+            Piece::BBishop|Piece::BKnight => -300, 
+            Piece::BRook => -500,
+            Piece::BQueen => -900,  
+        }
+    }
+
+    pub fn base_value(&self) -> isize {
+        match self {
+            Piece::Empty|Piece::WKing|Piece::BKing => 0, 
+            Piece::WPawn => 100, 
+            Piece::WBishop|Piece::WKnight => 300,
+            Piece::WRook => 500,
+            Piece::WQueen => 900,
+            Piece::BPawn => 100, 
+            Piece::BBishop|Piece::BKnight => 300, 
+            Piece::BRook => 500,
+            Piece::BQueen => 900,  
         }
     }
 
