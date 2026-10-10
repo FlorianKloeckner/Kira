@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
+arrayvec = "0.7.8"
 clippy = "0.0.302"
 rand = "=0.10.2"
 reqwest = {version = "=0.13.4", features = ["blocking", "json"] }
@@ -13,7 +14,7 @@ tokio = { version = "1", features = ["full"] }
 
 
 [profile.release]
-debug = false
+debug = true
 overflow-checks = false
 opt-level = 3
 lto = "fat"

@@ -10,6 +10,8 @@ use crate::Color;
 use crate::MoveType;
 use crate::offset_square;
 use crate::get_rank;
+use anyhow::Error;
+use arrayvec::ArrayVec;
 use undo::Undo;
 
 pub mod position_key;
@@ -119,6 +121,11 @@ const W_KING_EG_EVAL: [isize; 64] = [
     -50,-40,-30,-20,-20,-30,-40,-50
 ];
 const B_KING_EG_EVAL: [isize; 64] = flip(W_KING_EG_EVAL);
+
+pub struct Context {
+    pub nodes: usize,
+    pub start_time: Duration
+}
 
 
 #[derive(Clone, PartialEq, Debug)]
@@ -270,8 +277,8 @@ impl Board {
     }
  
 
-    pub fn generate_possible_moves(&self) -> Vec<Move> {
-        let mut possible_moves:Vec<Move> = Vec::new();
+    pub fn generate_possible_moves(&self) -> ArrayVec<Move, 218> {
+        let mut possible_moves = ArrayVec::<Move, 218>::new();
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
             let color = self.side_to_move;
@@ -315,7 +322,7 @@ impl Board {
             }
         }
 
-        let mut legal_moves = Vec::new();
+        let mut legal_moves = ArrayVec::<Move, 218>::new();
         //test pseudo-move to see if it is check
         for m in possible_moves {
             let mut test_board = self.clone();
@@ -329,7 +336,7 @@ impl Board {
     fn has_move(&self) -> bool {
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
-            let mut possible_moves: Vec<Move> = Vec::new();
+            let mut possible_moves = ArrayVec::<Move, 218>::new();
 
             match piece {
                 Piece::WKing|Piece::BKing => {
@@ -363,7 +370,7 @@ impl Board {
     }
     
 
-    fn generate_pawn_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_pawn_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
 
         let pawn_rank_direction = match self.side_to_move {
             Color::White => 1,
@@ -430,7 +437,7 @@ impl Board {
         }
             
     }
-    fn _generate_promotion_moves(&self, square: u8, pawn_square: u8, possible_moves: &mut Vec<Move>){
+    fn _generate_promotion_moves(&self, square: u8, pawn_square: u8, possible_moves: &mut ArrayVec<Move, 218>){
         possible_moves.push(Move {
             from: square,
             to: pawn_square,
@@ -454,7 +461,7 @@ impl Board {
         
     }
 
-    fn generate_knight_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_knight_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
         const KNIGHT_OFFSETS: [(i8, i8); 8] = [
             (1, 2),
             (2, 1),
@@ -479,7 +486,7 @@ impl Board {
         }
     }
 
-    fn generate_bishop_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_bishop_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
         const BISHOP_DIRECTIONS: [(i8, i8); 4] = [
             (1, 1),
             (1, -1),
@@ -489,11 +496,7 @@ impl Board {
         for (file_offset, rank_offset) in BISHOP_DIRECTIONS {
             let mut current = square;
 
-            loop {
-                let Some(next) = offset_square(current, file_offset, rank_offset) else{
-                    break;
-                };
-
+            while let Some(next) = offset_square(current, file_offset, rank_offset) {
                 current = next; 
                 if self.pieces[current as usize].color() !=
                     Some(self.side_to_move) {
@@ -513,7 +516,7 @@ impl Board {
         }
     }
 
-    fn generate_rook_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_rook_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
 
         const ROOK_DIRECTIONS: [(i8, i8); 4] = [
             (1, 0),
@@ -550,7 +553,7 @@ impl Board {
 
     }
 
-    fn generate_king_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_king_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
         const KING_OFFSETS: [(i8, i8); 8] = [
             (1, 0),
             (1, 1),
@@ -625,7 +628,7 @@ impl Board {
         }
     }
 
-    fn generate_queen_moves(&self, square: u8, possible_moves: &mut Vec<Move>){
+    fn generate_queen_moves(&self, square: u8, possible_moves: &mut ArrayVec<Move, 218>){
         self.generate_bishop_moves(square, possible_moves);
         self.generate_rook_moves(square, possible_moves);
 
@@ -737,11 +740,7 @@ impl Board {
         for &(file_offset, rank_offset) in directions {
             let mut current = square;
 
-            loop {
-                let Some(next) = offset_square(current, file_offset, rank_offset) else {
-                    break;
-                };
-
+            while let Some(next) = offset_square(current, file_offset, rank_offset) {
                 current = next;
 
                 match self.pieces[current as usize] {
@@ -900,6 +899,10 @@ impl Board {
         let mut best_move: Move = possible_moves[0];
         let mut current_depth = 1;
 
+        let mut cntxt = Context{
+            nodes: 0,
+            start_time: time_before,
+        };
         //iterative deepening
         loop {
             current_depth += 1;
@@ -915,7 +918,16 @@ impl Board {
 
             for (j,m) in possible_moves.iter().enumerate() {
                 let undo = self.make_move(m);
-                let score = -self.nega_max(current_depth-1, -beta, -alpha);
+                let result = self.nega_max(current_depth-1, -beta, -alpha, &mut cntxt);
+                let score = match result {
+                    Ok(r) => -r,
+                    Err(e) => {
+                        println!("{e}");
+                        let time_after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                        println!("search took {:?}", time_after-time_before);
+                        return best_move
+                     } //time is up, we respond with the best move from the previous iteration
+                };
                 if score > alpha {
                     alpha = score;
                     current_best_move = *m;
@@ -929,10 +941,6 @@ impl Board {
             let time_after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
             let time_taken = time_after - time_before;
             println!("completed search with depth {}, score {}, in {:?}", current_depth, alpha, time_taken);
-
-            if adaptive_depth_allowed && current_depth == adaptive_depth && time_taken < Duration::from_millis(50) {
-                adaptive_depth += 1;
-            }
             
         }
         
@@ -942,28 +950,34 @@ impl Board {
         best_move
     }
 
-    fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize) -> isize{
-        // let mut nodes = 0;
+    fn nega_max(&mut self, depth: usize, mut alpha: isize, beta: isize, context: &mut Context) -> Result<isize, &'static str>{
+        if context.nodes & 1024 == 0 {
+            let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            if current_time - context.start_time > Duration::from_millis(950) {
+                return Err("out of time")
+            }
+        }
         if self.is_draw() {
-            return 0; //meh outcome, there is more to be had :[
+            return Ok(0); //meh outcome, there is more to be had :[
         }
         
         if depth == 0 {
-            return self.quiesce_search(alpha, beta)
+            return Ok(self.quiesce_search(alpha, beta, context)?)
         }
 
         let possible_moves = self.generate_possible_moves();
 
         if possible_moves.is_empty() {
             if self.is_in_check(self.side_to_move){
-                return -Board::INF
+                return Ok(-Board::INF)
             }
-            return 0
+            return Ok(0)
         }        
         let mut best_score = -Board::INF; //mistake here likely
         for m in possible_moves.iter(){
+            context.nodes += 1;
             let undo = self.make_move(m);
-            let score = -self.nega_max(depth-1, -beta, -alpha);
+            let score = -self.nega_max(depth-1, -beta, -alpha, context)?;
                 
             self.unmake_move(m, undo);
 
@@ -975,57 +989,73 @@ impl Board {
                 break;
             }
         }
-        best_score
+        Ok(best_score)
     }
 
-    pub fn quiesce_search(&mut self, mut alpha: isize, beta: isize) -> isize {
-    let static_eval = self.evaluate();
-
-    if static_eval >= beta {
-        return static_eval;
-    }
-    
-    let mut best_score = static_eval;
-    if static_eval > alpha {
-        alpha = static_eval;
-    }
-
-    let possible_moves = self.generate_possible_moves();
-    
-    let mut captures: Vec<Move> = possible_moves.into_iter().filter(|m| {
-        self.pieces[m.to as usize] != Piece::Empty || m.move_type == MoveType::EnPassant
-    }).collect();
-
-    captures.sort_by_key(|m| {
-        let attacker_val = self.pieces[m.from as usize].base_value();
-        let victim_val = if m.move_type == MoveType::EnPassant {
-            100 
-        } else {
-            self.pieces[m.to as usize].base_value()
-        };
-        (10 * victim_val) - attacker_val
-    });
-
-    while let Some(current_move) = captures.pop() {
-        let undo = self.make_move(&current_move);
-        let score = -self.quiesce_search(-beta, -alpha);
-        self.unmake_move(&current_move, undo);
-
-        // FIX: Update best_score!
-        if score > best_score {
-            best_score = score;
+    pub fn quiesce_search(&mut self, mut alpha: isize, beta: isize, context: &mut Context) -> Result<isize, &'static str>  {
+        if context.nodes & 1023 == 0 {
+            let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            if current_time - context.start_time > Duration::from_millis(950) {
+                return Err("out of time")
+            }
         }
-        if score >= beta {
-            return score; // Fail-high
-        }
-        if score > alpha {
-            alpha = score;
-        }
-    }
+        let static_eval = self.evaluate();
 
-    // FIX: Return best_score, never just raw alpha!
-    best_score
-}
+        if static_eval >= beta {
+            return Ok(static_eval);
+        }
+        
+        let mut best_score = static_eval;
+        if static_eval > alpha {
+            alpha = static_eval;
+        }
+
+        let mut captures = self.generate_possible_moves();
+        
+        captures.retain(|m| {
+            self.pieces[m.to as usize] != Piece::Empty || m.move_type == MoveType::EnPassant
+        });
+
+        captures.sort_by_key(|m| {
+            let attacker_val = self.pieces[m.from as usize].base_value();
+            let victim_val = if m.move_type == MoveType::EnPassant {
+                100 
+            } else {
+                self.pieces[m.to as usize].base_value()
+            };
+            (10 * victim_val) - attacker_val
+        });
+
+        while let Some(current_move) = captures.pop() {
+            let target_square = current_move.to;
+            let victim_val = if current_move.move_type == MoveType::EnPassant {
+                100
+            } else {
+                self.pieces[target_square as usize].base_value()
+            };
+
+            if !matches!(current_move.move_type, MoveType::Promotion(_)) 
+                && static_eval + victim_val + 200 < alpha 
+            {
+                continue; // delta pruning
+            }
+            let undo = self.make_move(&current_move);
+            let score = -self.quiesce_search(-beta, -alpha, context)?;
+            self.unmake_move(&current_move, undo);
+
+            if score > best_score {
+                best_score = score;
+            }
+            if score >= beta {
+                return Ok(score); // Fail-high
+            }
+            if score > alpha {
+                alpha = score;
+            }
+        }
+
+        Ok(best_score)
+    }
 
     //returns true if the side currently to move is in checkmate
 
