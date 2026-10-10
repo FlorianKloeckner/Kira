@@ -58,8 +58,30 @@ fn main() {
         let bestmove = board.search(args[2].parse().expect(""), false);
         println!("bestmove: {:?}", bestmove);
     }
+    else if args[1] == "benni" {
+        //connect to server
+        benni_game_loop(args[2].as_str());
+        
+    }
 }
 
+
+fn benni_game_loop(color: &str) {
+    let c = match color {
+        "White" | "white" => Color::White,
+        "Black" | "black" =>  Color::Black,
+        _ => panic!("color argument has to be white or black!")
+     };
+    loop{
+        let mut board = requests::get_board().expect("Could not get board from server, maybe it is not started?");
+        if board.side_to_move == c {
+            let best_move = board.search(1000, true);
+            requests::send_move(&best_move, c);
+        }
+    }
+    
+
+}
 fn uci(){
     let mut board= setup_board();
     loop {

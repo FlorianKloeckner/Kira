@@ -8,19 +8,8 @@ use crate::{Color, Move, MoveType, board::Board, offset_square, piece::Piece, tr
 const URL:&str = "http://localhost:12345";
 
 
-pub fn update_board(_board: &mut Board) -> Option<Board>{
-    //get board gets almost everything, we just want to keep the old position history 
-    //and add the current positon on it
-    let new_board = get_board()?;
-    //new_board.position_history_hashed = board.position_history_hashed.clone();
-    //new_board.add_current_position_to_history();
-
-    Some(new_board)
-    
-
-}
 //add check if server is reachable
-fn get_board() -> Option<Board> {
+pub fn get_board() -> Option<Board> {
     if !is_server_online() {
         eprintln!("Server is not online!");
         //maybe start server?
@@ -40,7 +29,6 @@ fn get_board() -> Option<Board> {
         .ok()?
         .text()
         .ok()?;
-    println!("Extracted text: {}", text);
     // serde deserialization needs type annotations, because it can also deserialize
     // into custom structs
     // if the json wasnt this odd, I might have done that...
@@ -53,7 +41,6 @@ fn get_board() -> Option<Board> {
             return None;}
     };
     let json_pieces = json["response"]["board"]["pieces"].as_array()?;
-    println!("Pieces arr: {:?}", json_pieces);
     let mut pieces = [Piece::Empty; 64];
     let mut en_passant_target_square:Option<u8> = None;
     for p in json_pieces {
@@ -93,7 +80,6 @@ fn get_board() -> Option<Board> {
 
     //we cannot return the whole position history, since the server does not return 
     //all moves
-    println!("Side to move: {:?}", side_to_move);
     //figure out castling rights
     let mut white_queen_castling_possible = false;
     let mut white_king_castling_possible = false;

@@ -277,7 +277,7 @@ impl Board {
     }
  
 
-    pub fn generate_possible_moves(&self) -> ArrayVec<Move, 218> {
+    pub fn generate_possible_moves(&mut self) -> ArrayVec<Move, 218> {
         let mut possible_moves = ArrayVec::<Move, 218>::new();
         for (i, piece) in self.pieces.iter().enumerate() {
             let square: u8 = i.try_into().unwrap();
@@ -325,11 +325,12 @@ impl Board {
         let mut legal_moves = ArrayVec::<Move, 218>::new();
         //test pseudo-move to see if it is check
         for m in possible_moves {
-            let mut test_board = self.clone();
-            test_board.make_move(&m);
-            if !test_board.is_in_check(self.side_to_move) {
+            let undo = self.make_move(&m);
+            // make_move inverts side_to_move, so check if the previous side is in check
+            if !self.is_in_check(self.side_to_move.invert()) { 
                 legal_moves.push(m);
             }
+            self.unmake_move(&m, undo);
         }
         legal_moves
     }
@@ -763,10 +764,12 @@ impl Board {
     fn is_in_check(&self, color: Color) -> bool {
         let king = color.king();
 
-        let opt_king_square = self
-            .pieces
-            .iter()
-            .position(|&piece| piece == king);
+        let opt_king_square = if color == Color::Black {
+            self.pieces.iter().rposition(|&piece| piece == king)
+        } else {
+            self.pieces.iter().position(|&piece| piece == king)
+        };
+
         let king_square = match opt_king_square {
             Some(k) => k as u8,
             None => {
@@ -1016,7 +1019,7 @@ impl Board {
             self.pieces[m.to as usize] != Piece::Empty || m.move_type == MoveType::EnPassant
         });
 
-        captures.sort_by_key(|m| {
+        captures.sort_unstable_by_key(|m| {
             let attacker_val = self.pieces[m.from as usize].base_value();
             let victim_val = if m.move_type == MoveType::EnPassant {
                 100 
@@ -1065,6 +1068,11 @@ impl Board {
 
     pub fn is_draw(&self) -> bool {
         //returns true if no pieces other than kings are on the board
-        self.pieces.iter().filter(|x| **x != Piece::WKing && **x != Piece::BKing && **x != Piece::Empty).count() == 0
+        for p in &self.pieces {
+            if *p != Piece::WKing && *p != Piece::BKing && *p != Piece::Empty {
+                return false;
+            }
+        }
+        true
     }
 }
