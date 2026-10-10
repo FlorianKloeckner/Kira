@@ -239,63 +239,63 @@ pub enum Color {
 }
 
 impl Color {
-    fn pawn(self) -> Piece {
+    pub fn pawn(self) -> Piece {
         match self {
             Color::White => Piece::WPawn,
             Color::Black => Piece::BPawn,
         }
     }
 
-    fn knight(self) -> Piece {
+    pub fn knight(self) -> Piece {
         match self {
             Color::White => Piece::WKnight,
             Color::Black => Piece::BKnight,
         }
     }
 
-    fn bishop(self) -> Piece {
+    pub fn bishop(self) -> Piece {
         match self {
             Color::White => Piece::WBishop,
             Color::Black => Piece::BBishop,
         }
     }
 
-    fn rook(self) -> Piece {
+    pub fn rook(self) -> Piece {
         match self {
             Color::White => Piece::WRook,
             Color::Black => Piece::BRook,
         }
     }
 
-    fn queen(self) -> Piece {
+    pub fn queen(self) -> Piece {
         match self {
             Color::White => Piece::WQueen,
             Color::Black => Piece::BQueen,
         }
     }
 
-    fn king(self) -> Piece {
+    pub fn king(self) -> Piece {
         match self {
             Color::White => Piece::WKing,
             Color::Black => Piece::BKing,
         }
     }
 
-    fn invert(self) -> Color{
+    pub fn invert(self) -> Color{
         match self {
             Color::White => Color::Black,
             Color::Black => Color::White,
         }
     }
     
-    fn value(self) -> isize{
+    pub fn value(self) -> isize{
         match self {
             Color::White => 1,
             Color::Black => -1,
         }
     }
 
-    fn password(self) -> &'static str{
+    pub fn password(self) -> &'static str{
         match self {
             Color::Black => "1234",
             Color::White => "5678",

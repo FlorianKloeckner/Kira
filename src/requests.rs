@@ -65,7 +65,7 @@ pub fn get_board() -> Option<Board> {
                 None
             })?;        
         if piece == Piece::WPawn || piece == Piece::BPawn {
-            let en_pass_possible = p["enPassePossible"].as_bool()
+            let en_pass_possible = p["enPasseIsPossible"].as_bool()
             .or_else(|| {
                 eprintln!("Could not deserialize en_pass_possible from json");
                 None
@@ -154,10 +154,10 @@ fn piece_name_color_to_piece(piece_name: &str, piece_color: &str) -> Option<Piec
     match (piece_name, piece_color) {
         ("PAWN", "WHITE") => Some(Piece::WPawn),
         ("PAWN", "BLACK") => Some(Piece::BPawn),
-        ("BISHOP", "WHITE") => Some(Piece::WKnight), //Knight and Bishop are swapped in the api lol
-        ("BISHOP", "BLACK") => Some(Piece::BKnight),
-        ("KNIGHT", "WHITE") => Some(Piece::WBishop),
-        ("KNIGHT", "BLACK") => Some(Piece::BBishop),
+        ("KNIGHT", "WHITE") => Some(Piece::WKnight), //Knight and Bishop are swapped in the api lol
+        ("KNIGHT", "BLACK") => Some(Piece::BKnight),
+        ("BISHOP", "WHITE") => Some(Piece::WBishop),
+        ("BISHOP", "BLACK") => Some(Piece::BBishop),
         ("ROOK", "WHITE") => Some(Piece::WRook),
         ("ROOK", "BLACK") => Some(Piece::BRook),
         ("QUEEN", "WHITE") => Some(Piece::WQueen),

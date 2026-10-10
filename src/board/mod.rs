@@ -378,35 +378,35 @@ impl Board {
             Color::Black => -1
         };
         //step by one
-        if let Some(pawn_square) = 
-            offset_square(square, 0, pawn_rank_direction)
-            && self.pieces[pawn_square as usize] == Piece::Empty {
-                if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0{
+        if let Some(pawn_square) = offset_square(square, 0, pawn_rank_direction) {
+            if self.pieces[pawn_square as usize] == Piece::Empty {
+                if get_rank(pawn_square) == 7 || get_rank(pawn_square) == 0 {
                     self._generate_promotion_moves(square, pawn_square, possible_moves);
-                }
-                else {
+                } else {
                     possible_moves.push(Move {
-                    from: square, 
-                    to: pawn_square,
-                    move_type: MoveType::Normal,
+                        from: square, 
+                        to: pawn_square,
+                        move_type: MoveType::Normal,
                     });
                 }
                 //step by two
-                if get_rank(square) == match self.side_to_move {
-                        Color::White => 1, 
-                        Color::Black => 6
+                let start_rank = match self.side_to_move {
+                    Color::White => 1, 
+                    Color::Black => 6,
+                };
+                if get_rank(square) == start_rank {
+                    if let Some(pawn_square_two) = offset_square(square, 0, pawn_rank_direction * 2) {
+                        if self.pieces[pawn_square_two as usize] == Piece::Empty {
+                            possible_moves.push(Move {
+                                from: square,
+                                to: pawn_square_two,
+                                move_type: MoveType::PawnDoubleStep,
+                            });
+                        }
                     }
-                    && let Some(pawn_square) = 
-                        offset_square(square, 0, pawn_rank_direction*2)
-                            && self.pieces[pawn_square as usize] == Piece::Empty {
-                                possible_moves.push(Move {
-                                    from: square,
-                                    to: pawn_square,
-                                    move_type: MoveType::PawnDoubleStep,
-                                });
-                            }
-                
+                }
             }
+        }
         //captures
         for file_offset in [-1, 1] {
             if let Some(pawn_square) = 
@@ -424,14 +424,13 @@ impl Board {
                         }
                     }
                     //en passant
-                    if let Some(en_square) = self.en_passant_target_square
-                        && pawn_square == en_square{
-                            possible_moves.push(Move{
-                                from: square,
-                                to: pawn_square,
-                                move_type: MoveType::EnPassant,
-                            });
-                        } 
+                    if self.en_passant_target_square == Some(pawn_square) {
+                        possible_moves.push(Move{
+                            from: square,
+                            to: pawn_square,
+                            move_type: MoveType::EnPassant,
+                        });
+                    } 
                     
                 }
 
@@ -475,15 +474,15 @@ impl Board {
         ];
 
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
-            if let Some(destination) = offset_square(square, file_offset, rank_offset)
-                && self.pieces[destination as usize].color() != Some(self.side_to_move) {
+            if let Some(destination) = offset_square(square, file_offset, rank_offset) {
+                if self.pieces[destination as usize].color() != Some(self.side_to_move) {
                     possible_moves.push(Move {
                         from: square,
                         to: destination,
                         move_type: MoveType::Normal,
-                    })
+                    });
                 }
-            
+            }
         }
     }
 
@@ -567,15 +566,15 @@ impl Board {
         ];
 
         for (file_offset, rank_offset) in KING_OFFSETS {
-            if let Some(destination) = 
-                offset_square(square, file_offset, rank_offset)
-                    && self.pieces[destination as usize].color() != Some(self.side_to_move) {
-                        possible_moves.push(Move {
-                            from: square, 
-                            to: destination,
-                            move_type: MoveType::Normal,
-                        });
-                    }
+            if let Some(destination) = offset_square(square, file_offset, rank_offset) {
+                if self.pieces[destination as usize].color() != Some(self.side_to_move) {
+                    possible_moves.push(Move {
+                        from: square, 
+                        to: destination,
+                        move_type: MoveType::Normal,
+                    });
+                }
+            }
         }
         //determine if castling is possible
         //castling is possible if king and rook have not been taken or been moved
@@ -652,11 +651,11 @@ impl Board {
         };
 
         for file_offset in [-1, 1] {
-            if let Some(pawn_square) =
-                offset_square(square, file_offset, pawn_rank_direction)
-                && self.pieces[pawn_square as usize] == color.pawn() {
+            if let Some(pawn_square) = offset_square(square, file_offset, pawn_rank_direction) {
+                if self.pieces[pawn_square as usize] == color.pawn() {
                     return true;
                 }
+            }
         }
 
         // -------------------------------------------------
@@ -675,10 +674,11 @@ impl Board {
         ];
 
         for (file_offset, rank_offset) in KNIGHT_OFFSETS {
-            if let Some(source) = offset_square(square, file_offset, rank_offset)
-                && self.pieces[source as usize] == color.knight() {
+            if let Some(source) = offset_square(square, file_offset, rank_offset) {
+                if self.pieces[source as usize] == color.knight() {
                     return true;
                 }
+            }
         }
 
         // -------------------------------------------------
@@ -761,7 +761,7 @@ impl Board {
         false
     }
 
-    fn is_in_check(&self, color: Color) -> bool {
+    pub fn is_in_check(&self, color: Color) -> bool {
         let king = color.king();
 
         let opt_king_square = if color == Color::Black {

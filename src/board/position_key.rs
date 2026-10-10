@@ -51,12 +51,13 @@ pub fn zobrist_hash(board: &Board)  -> u64{
                 Color::White => -1,
                 Color::Black => 1,
             };
-            if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset)
-                && board.pieces[target_square as usize] == board.side_to_move.pawn() {
+            if let Some(target_square) = crate::offset_square(square, file_offset, rank_offset) {
+                if board.pieces[target_square as usize] == board.side_to_move.pawn() {
                     let index = crate::get_file(square) as usize;
                     en_passant = RANDOM64[772 + index];
                     break;
                 }
+            }
         }  
     }
 
