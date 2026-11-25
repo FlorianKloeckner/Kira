@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play Kira</title>
+  <meta name="description" content="Play chess against Kira, a chess engine written in Rust that runs entirely in your browser.">
+  <link rel="stylesheet" href="vendor/chessground.base.css">
+  <link rel="stylesheet" href="vendor/chessground.brown.css">
+  <link rel="stylesheet" href="vendor/chessground.cburnett.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Kira</h1>
+    <p class="tagline">A chess engine written in Rust, running in your browser.</p>
+  </header>
+
+  <main>
+    <section class="board-area">
+      <div class="player player-top"><span class="name" id="name-top">Kira</span></div>
+      <div class="board-frame">
+        <div id="board" class="cg-wrap"></div>
+        <div id="promotion" class="promotion" hidden>
+          <div class="promotion-choices" id="promotion-choices"></div>
+        </div>
+      </div>
+      <div class="player player-bottom"><span class="name" id="name-bottom">You</span></div>
+    </section>
+
+    <aside class="panel">
+      <div class="status" id="status" role="status" aria-live="polite">Loading engine…</div>
+
+      <div class="controls">
+        <label class="field">
+          <span>Play as</span>
+          <select id="side">
+            <option value="white">White</option>
+            <option value="black">Black</option>
+            <option value="random">Random</option>
+          </select>
+        </label>
+        <div class="buttons">
+          <button id="new-game" class="primary">New game</button>
+          <button id="takeback">Take back</button>
+          <button id="flip">Flip board</button>
+          <button id="copy-pgn">Copy PGN</button>
+        </div>
+      </div>
+
+      <ol class="moves" id="moves" aria-label="Moves"></ol>
+      <p class="engine-info" id="engine-info"></p>
+    </aside>
+  </main>
+
+  <footer>
+    Board: <a href="https://github.com/lichess-org/chessground">chessground</a> (GPL-3.0),
+    rules: <a href="https://github.com/jhlywa/chess.js">chess.js</a> (BSD-2-Clause).
+    The engine runs locally on your device; nothing is sent to a server.
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

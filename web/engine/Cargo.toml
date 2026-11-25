@@ -1,0 +1,26 @@
+# Builds the unmodified Kira engine (../../Kira/src) for the browser.
+# Only the dependencies the engine source actually uses are listed here,
+# so Kira's own Cargo.toml (tokio, reqwest, ...) is not involved.
+[package]
+name = "kira-wasm"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "kira"
+path = "../../Kira/src/main.rs"
+
+[dependencies]
+arrayvec = "0.7.8"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = true
+
+# Stand-alone: never join a workspace further up the tree.
+[workspace]
