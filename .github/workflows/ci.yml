@@ -20,7 +20,7 @@ jobs:
         - name: Perft smoke test
           run: |
             ./target/release/Kira perft 4 2>&1 | tee perft.txt
-            grep -q "found" 197281 nodes" perft.txt
+            grep -q "found 197281 nodes" perft.txt
 
     web: 
       needs: test
