@@ -6,6 +6,7 @@ use crate::offset_square;
 use crate::piece::Piece;
 use arrayvec::ArrayVec;
 use core::panic;
+use core::time;
 use std::fmt;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -845,7 +846,7 @@ impl Board {
         }
 
         if depth == 0 {
-            return Ok(self.quiesce_search(alpha, beta, context)?);
+            return Ok(self.quiesce_search(alpha, beta, context, time_limit)?);
         }
 
         let possible_moves = self.generate_possible_moves();
@@ -880,10 +881,11 @@ impl Board {
         mut alpha: isize,
         beta: isize,
         context: &mut Context,
+        time_limit: u64,
     ) -> Result<isize, &'static str> {
         if context.nodes & 1023 == 0 {
             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-            if current_time - context.start_time > Duration::from_millis(950) {
+            if current_time - context.start_time > Duration::from_millis(time_limit) {
                 return Err("out of time");
             }
         }
@@ -928,7 +930,7 @@ impl Board {
                 continue; // delta pruning
             }
             let undo = self.make_move(&current_move);
-            let score = -self.quiesce_search(-beta, -alpha, context)?;
+            let score = -self.quiesce_search(-beta, -alpha, context, time_limit)?;
             self.unmake_move(&current_move, undo);
 
             if score > best_score {
