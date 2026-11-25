@@ -1,30 +1,26 @@
+use crate::board::Board;
+use crate::piece::Piece;
 use std::env;
 use std::io::{self};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::seq::{IndexedRandom};
-use crate::piece::Piece;
-use crate::board::Board;
 
 use crate::translate_move_uci::{move_to_uci, uci_to_move};
-mod requests;
 
 mod board;
 
-pub mod translate_move_uci;
 pub mod piece;
+pub mod translate_move_uci;
 
-//TODO debug 7 depth perft (setup stockfish with the same stuff)
 //TODO load_fen
 //TODO fuck 50-Move rule, we dont fucking care
 
-const ENGINE_NAME:&str = "Kira V0.1";
-const AUTHOR_NAME:&str = "Dudelord";
-
+const ENGINE_NAME: &str = "Kira V0.1";
+const AUTHOR_NAME: &str = "Dudelord";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
-    
+
     if args.len() < 2 {
         uci();
         return;
@@ -33,78 +29,62 @@ fn main() {
     println!("{:?}", args);
     if args[1] == "perft" {
         let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let amount = perft(&mut board, args[2].parse().expect("argument after perft must be integer"));
+        let amount = perft(
+            &mut board,
+            args[2]
+                .parse()
+                .expect("argument after perft must be integer"),
+        );
         let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-        eprintln!("found {amount} nodes in {:?}", end-start);
-    }
-    else if args[1] == "dperft" {
-        divided_perft(&mut board, args[2].parse().expect("argument after dperft must be depth"));
-    }
-    else if args[1] == "fperft" {
+        eprintln!("found {amount} nodes in {:?}", end - start);
+    } else if args[1] == "dperft" {
+        divided_perft(
+            &mut board,
+            args[2]
+                .parse()
+                .expect("argument after dperft must be depth"),
+        );
+    } else if args[1] == "fperft" {
         board = load_fen(&args[2]).unwrap();
         divided_perft(&mut board, args[3].parse().expect(""));
-    }
-    else if args[1] == "fen" {
+    } else if args[1] == "fen" {
         let mut res = load_fen(&args[2]).unwrap();
         println!("successfully loaded board: ");
         println!("{res}");
-        let zobrist =  board::position_key::zobrist_hash(&res);
+        let zobrist = board::position_key::zobrist_hash(&res);
         println!("zobrist key: {:#x}", zobrist);
         let best_move = res.search(4, false);
         println!("best move is: {}", move_to_uci(&best_move));
-    }
-    else if args[1]  == "search" {
+    } else if args[1] == "search" {
         let bestmove = board.search(args[2].parse().expect(""), false);
         println!("bestmove: {:?}", bestmove);
     }
-    else if args[1] == "benni" {
-        //connect to server
-        benni_game_loop(args[2].as_str());
-        
-    }
 }
 
-
-fn benni_game_loop(color: &str) {
-    let c = match color {
-        "White" | "white" => Color::White,
-        "Black" | "black" =>  Color::Black,
-        _ => panic!("color argument has to be white or black!")
-     };
-    loop{
-        let mut board = requests::get_board().expect("Could not get board from server, maybe it is not started?");
-        if board.side_to_move == c {
-            let best_move = board.search(1000, true);
-            requests::send_move(&best_move, c);
-        }
-    }
-    
-
-}
-fn uci(){
-    let mut board= setup_board();
+fn uci() {
+    let mut board = setup_board();
     loop {
         //Phase 1: Wait for input
-        let mut full_command = String::new(); 
-        
+        let mut full_command = String::new();
+
         io::stdin()
             .read_line(&mut full_command)
             .expect("failed to read uci move");
         let mut command_words = full_command.split(" ");
         let first_command = command_words.next().unwrap().trim();
-        match first_command{
+        match first_command {
             "uci" => eprintln!("id name {}\nid author {}\nuciok", ENGINE_NAME, AUTHOR_NAME),
             "isready" => eprintln!("readyok"),
-            "ucinewgame" => board = setup_board(),//dont really need to do things, as we are stateless rn
+            "ucinewgame" => board = setup_board(), //dont really need to do things, as we are stateless rn
             "position" => board = uci_parse_position_string(&full_command),
             "go" => uci_parse_go_string(&full_command, &mut board),
             "quit" => return,
             _ => println!("That is not a valid command!"),
         }
     }
-    
-    //Phase 2: match input and 
+
+    //Phase 2: match input and
 }
 
 fn uci_parse_go_string(full_command: &str, b: &mut Board) {
@@ -113,7 +93,7 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     //go nodes N
     //go wtime N btime N winc N binc N
     let args: Vec<&str> = full_command.split(" ").collect();
-    let best_move = match args[1].trim(){
+    let best_move = match args[1].trim() {
         "depth" => b.search(args[2].trim().parse().unwrap(), false),
         "movetime" => b.search(40, true),
         "nodes" => b.search(40, true),
@@ -123,22 +103,20 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     eprintln!("bestmove {}", move_to_uci(&best_move));
 }
 
-fn uci_parse_position_string(full_command: &str) -> Board{
+fn uci_parse_position_string(full_command: &str) -> Board {
     //TODO
     let mut board = setup_board();
     let args: Vec<&str> = full_command.split(" ").collect();
     let second = args[1];
     match second.trim() {
-        "startpos" => {
-            match args.get(2){
-                None => (),
-                Some(_) => make_uci_moves(&args[3..], &mut board),
-            }
+        "startpos" => match args.get(2) {
+            None => (),
+            Some(_) => make_uci_moves(&args[3..], &mut board),
         },
         "fen" => {
             let fen = args[2..8].join(" ");
             board = load_fen(&fen).unwrap();
-            match args.get(8){
+            match args.get(8) {
                 None => (),
                 Some(_) => make_uci_moves(&args[9..], &mut board),
             }
@@ -150,49 +128,13 @@ fn uci_parse_position_string(full_command: &str) -> Board{
     board
 }
 
-fn make_uci_moves(moves: &[&str], board: &mut Board){
+fn make_uci_moves(moves: &[&str], board: &mut Board) {
     println!("DEBUG: moves: {moves:#?}");
-    for m in moves{
+    for m in moves {
         let board_move = uci_to_move(m.trim(), board).expect("could not parse move {m}");
         board.make_move(&board_move);
     }
 }
-
-// fn test_full_game_benjo_server() -> Option<()>{
-
-//     let res = square_to_algebraic(9);
-//     eprintln!("{}, {}", res, res.to_ascii_uppercase());
-//     let mut board = setup_board();
-//     let mut rng = rand::rng();
-//     for _ in 0..2000 {
-//         let possible_moves = board.generate_possible_moves();
-//         let m = possible_moves.choose(&mut rand::rng())?;
-//         let response = requests::send_move(m, board.side_to_move);
-//         if let Err(msg) = response {
-//             eprintln!("ERROR: {msg}");
-//             panic!();
-//         }
-
-        
-//         let mut new_board = update_board(&mut board)?;
-//         board.make_move(&m);
-//         new_board.position_history_hashed = Vec::new();
-//         board.position_history_hashed = Vec::new();
-//         eprintln!("{}", board);
-//         eprintln!("made move: {}", move_to_uci(&m));
-
-//         assert_eq!(board, new_board);
-
-
-//         if board.is_checkmate() | board.is_draw() {
-//             return None
-//         }
-//     }
-//     None
-
-// }
-
-
 
 fn perft(b: &mut Board, depth: u8) -> usize {
     let mut nodes: usize = 0;
@@ -215,12 +157,12 @@ fn perft(b: &mut Board, depth: u8) -> usize {
     nodes
 }
 
-fn divided_perft(b:&mut Board, depth: u8) {
+fn divided_perft(b: &mut Board, depth: u8) {
     let possible_moves = b.generate_possible_moves();
     let mut total_nodes = 0;
     for m in possible_moves.iter() {
         let undo = b.make_move(m);
-        let nodes = perft(b, depth-1);
+        let nodes = perft(b, depth - 1);
         b.unmake_move(m, undo);
         eprintln!("{}: {:?}", move_to_uci(m), nodes);
         total_nodes += nodes;
@@ -231,11 +173,10 @@ fn divided_perft(b:&mut Board, depth: u8) {
 /// Parses "position <fen> move <uci>" and returns just the trailing UCI move,
 /// discarding the fen — board state is tracked internally, not taken from the gui.
 
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Color {
-    White, 
-    Black
+    White,
+    Black,
 }
 
 impl Color {
@@ -281,21 +222,21 @@ impl Color {
         }
     }
 
-    pub fn invert(self) -> Color{
+    pub fn invert(self) -> Color {
         match self {
             Color::White => Color::Black,
             Color::Black => Color::White,
         }
     }
-    
-    pub fn value(self) -> isize{
+
+    pub fn value(self) -> isize {
         match self {
             Color::White => 1,
             Color::Black => -1,
         }
     }
 
-    pub fn password(self) -> &'static str{
+    pub fn password(self) -> &'static str {
         match self {
             Color::Black => "1234",
             Color::White => "5678",
@@ -303,13 +244,10 @@ impl Color {
     }
 }
 
-
-
-fn setup_board() -> Board{
-    
+fn setup_board() -> Board {
     Board {
         pieces: {
-            let mut piece_arr: [Piece; 64] = {[Piece::Empty; 64]};
+            let mut piece_arr: [Piece; 64] = { [Piece::Empty; 64] };
             piece_arr[0] = Piece::WRook;
             piece_arr[1] = Piece::WKnight;
             piece_arr[2] = Piece::WBishop;
@@ -344,20 +282,17 @@ fn setup_board() -> Board{
     }
 }
 
-
-pub fn get_rank(index: u8) -> u8{
-    index / 8 
+pub fn get_rank(index: u8) -> u8 {
+    index / 8
 }
 
-pub fn get_file(index: u8) -> u8{
-    index % 8 
+pub fn get_file(index: u8) -> u8 {
+    index % 8
 }
-
-
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Move {
-    from: u8, 
+    from: u8,
     to: u8,
     move_type: MoveType,
 }
@@ -430,12 +365,7 @@ fn load_fen(fen: &str) -> Result<Board, String> {
                     'q' => Piece::BQueen,
                     'k' => Piece::BKing,
 
-                    _ => {
-                        return Err(format!(
-                            "Invalid FEN: unknown piece '{}'",
-                            c
-                        ))
-                    }
+                    _ => return Err(format!("Invalid FEN: unknown piece '{}'", c)),
                 };
 
                 let board_index = board_rank * 8 + file;
@@ -488,12 +418,12 @@ fn load_fen(fen: &str) -> Result<Board, String> {
         }
 
         let file = match bytes[0] {
-            b'a'..=b'h' => bytes[0] - b'a' ,
+            b'a'..=b'h' => bytes[0] - b'a',
             _ => return Err("Invalid FEN: invalid en-passant file".to_string()),
         };
 
         let rank = match bytes[1] {
-            b'1'..=b'8' => bytes[1] - b'1' ,
+            b'1'..=b'8' => bytes[1] - b'1',
             _ => return Err("Invalid FEN: invalid en-passant rank".to_string()),
         };
 
