@@ -41,7 +41,7 @@ jobs:
 
     deploy:                          # CD: publish, only from main
       needs: web
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       runs-on: ubuntu-latest
       permissions:
         pages: write
