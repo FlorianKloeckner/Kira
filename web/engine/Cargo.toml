@@ -9,7 +9,7 @@ publish = false
 
 [[bin]]
 name = "kira"
-path = "../../Kira/src/main.rs"
+path = "../../src/main.rs"
 
 [dependencies]
 arrayvec = "0.7.8"
