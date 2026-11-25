@@ -12,79 +12,9 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use undo::Undo;
 
+mod evals;
 pub mod position_key;
 mod undo;
-
-const fn flip(table: [isize; 64]) -> [isize; 64] {
-    let mut flipped = [0; 64];
-    let mut i = 0;
-    while i < 64 {
-        let rank = i / 8;
-        let file = i % 8;
-        let flipped_rank = 7 - rank;
-        flipped[flipped_rank * 8 + file] = table[i];
-        i += 1;
-    }
-    flipped
-}
-
-// PAWNS
-const W_PAWN_EVAL: [isize; 64] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, -20, -20, 10, 10, 5, 5, -5, -10, 0, 0, -10, -5, 5, 0, 0, 0,
-    20, 20, 0, 0, 0, 5, 5, 10, 25, 25, 10, 5, 5, 10, 10, 20, 30, 30, 20, 10, 10, 50, 50, 50, 50,
-    50, 50, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-const B_PAWN_EVAL: [isize; 64] = flip(W_PAWN_EVAL);
-
-// KNIGHTS
-const W_KNIGHT_EVAL: [isize; 64] = [
-    -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 5, 5, 0, -20, -40, -30, 5, 10, 15, 15, 10,
-    5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 10, 15, 15, 10,
-    0, -30, -40, -20, 0, 0, 0, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
-];
-const B_KNIGHT_EVAL: [isize; 64] = flip(W_KNIGHT_EVAL);
-
-// BISHOPS
-const W_BISHOP_EVAL: [isize; 64] = [
-    -20, -10, -10, -10, -10, -10, -10, -20, -10, 5, 0, 0, 0, 0, 5, -10, -10, 10, 10, 10, 10, 10,
-    10, -10, -10, 0, 10, 10, 10, 10, 0, -10, -10, 5, 5, 10, 10, 5, 5, -10, -10, 0, 5, 10, 10, 5, 0,
-    -10, -10, 0, 0, 0, 0, 0, 0, -10, -20, -10, -10, -10, -10, -10, -10, -20,
-];
-const B_BISHOP_EVAL: [isize; 64] = flip(W_BISHOP_EVAL);
-
-// ROOKS
-const W_ROOK_EVAL: [isize; 64] = [
-    0, 0, 0, 5, 5, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0,
-    0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, 5, 10, 10, 10, 10, 10, 10, 5, 0, 0,
-    0, 0, 0, 0, 0, 0,
-];
-const B_ROOK_EVAL: [isize; 64] = flip(W_ROOK_EVAL);
-
-// QUEENS
-const W_QUEEN_EVAL: [isize; 64] = [
-    -20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 5, 0, 0, 0, 0, -10, -10, 5, 5, 5, 5, 5, 0, -10,
-    0, 0, 5, 5, 5, 5, 0, -5, -5, 0, 5, 5, 5, 5, 0, -5, -10, 0, 5, 5, 5, 5, 0, -10, -10, 0, 0, 0, 0,
-    0, 0, -10, -20, -10, -10, -5, -5, -10, -10, -20,
-];
-const B_QUEEN_EVAL: [isize; 64] = flip(W_QUEEN_EVAL);
-
-// KING MIDDLEGAME
-const W_KING_MG_EVAL: [isize; 64] = [
-    20, 30, 10, 0, 0, 10, 30, 20, // Rank 1: Strongly favor G1/C1 for castling
-    20, 20, 0, 0, 0, 0, 20, 20, -10, -20, -20, -20, -20, -20, -20, -10, -20, -30, -30, -40, -40,
-    -30, -30, -20, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30,
-];
-const B_KING_MG_EVAL: [isize; 64] = flip(W_KING_MG_EVAL);
-
-// KING ENDGAME
-const W_KING_EG_EVAL: [isize; 64] = [
-    -50, -30, -30, -30, -30, -30, -30, -50, // Rank 1: Penalize sitting on the back rank
-    -30, -30, 0, 0, 0, 0, -30, -30, -30, -10, 20, 30, 30, 20, -10, -30, -30, -10, 30, 40, 40, 30,
-    -10, -30, -30, -10, 30, 40, 40, 30, -10, -30, -30, -10, 20, 30, 30, 20, -10, -30, -30, -20,
-    -10, 0, 0, -10, -20, -30, -50, -40, -30, -20, -20, -30, -40, -50,
-];
-const B_KING_EG_EVAL: [isize; 64] = flip(W_KING_EG_EVAL);
 
 pub struct Context {
     pub nodes: usize,
@@ -801,7 +731,7 @@ impl Board {
         }
         fen_string
     }
-
+    //money function right here
     pub fn evaluate(&self) -> isize {
         let mut score = 0;
         let side_val = self.side_to_move.value();
@@ -812,26 +742,26 @@ impl Board {
             score += p.score();
             match p {
                 Piece::Empty => continue,
-                Piece::WPawn => score += W_PAWN_EVAL[i],
-                Piece::BPawn => score -= B_PAWN_EVAL[i],
-                Piece::WKnight => score += W_KNIGHT_EVAL[i],
-                Piece::BKnight => score -= B_KNIGHT_EVAL[i],
-                Piece::WBishop => score += W_BISHOP_EVAL[i],
-                Piece::BBishop => score -= B_BISHOP_EVAL[i],
-                Piece::WRook => score += W_ROOK_EVAL[i],
-                Piece::BRook => score -= B_ROOK_EVAL[i],
-                Piece::WQueen => score += W_QUEEN_EVAL[i],
-                Piece::BQueen => score -= B_QUEEN_EVAL[i],
-                Piece::WKing => score += W_KING_MG_EVAL[i],
-                Piece::BKing => score -= B_KING_MG_EVAL[i],
+                Piece::WPawn => score += evals::W_PAWN_EVAL[i],
+                Piece::BPawn => score -= evals::B_PAWN_EVAL[i],
+                Piece::WKnight => score += evals::W_KNIGHT_EVAL[i],
+                Piece::BKnight => score -= evals::B_KNIGHT_EVAL[i],
+                Piece::WBishop => score += evals::W_BISHOP_EVAL[i],
+                Piece::BBishop => score -= evals::B_BISHOP_EVAL[i],
+                Piece::WRook => score += evals::W_ROOK_EVAL[i],
+                Piece::BRook => score -= evals::B_ROOK_EVAL[i],
+                Piece::WQueen => score += evals::W_QUEEN_EVAL[i],
+                Piece::BQueen => score -= evals::B_QUEEN_EVAL[i],
+                Piece::WKing => score += evals::W_KING_MG_EVAL[i],
+                Piece::BKing => score -= evals::B_KING_MG_EVAL[i],
             };
         }
 
         score * side_val
     }
 
-    pub fn search(&mut self, depth: usize, adaptive_depth_allowed: bool) -> Move {
-        let mut adaptive_depth = depth;
+    pub fn search(&mut self, depth: usize) -> Move {
+        let adaptive_depth = depth;
 
         println!(
             "info: now searching for best move with depth {depth}, side to move is {:?}",

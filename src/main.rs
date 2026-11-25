@@ -14,8 +14,8 @@ pub mod translate_move_uci;
 //TODO load_fen
 //TODO fuck 50-Move rule, we dont fucking care
 
-const ENGINE_NAME: &str = "Kira V0.1";
-const AUTHOR_NAME: &str = "Dudelord";
+const ENGINE_NAME: &str = "Kira V0.2";
+const AUTHOR_NAME: &str = "Florian Klöckner";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -54,10 +54,10 @@ fn main() {
         println!("{res}");
         let zobrist = board::position_key::zobrist_hash(&res);
         println!("zobrist key: {:#x}", zobrist);
-        let best_move = res.search(4, false);
+        let best_move = res.search(4);
         println!("best move is: {}", move_to_uci(&best_move));
     } else if args[1] == "search" {
-        let bestmove = board.search(args[2].parse().expect(""), false);
+        let bestmove = board.search(args[2].parse().expect(""));
         println!("bestmove: {:?}", bestmove);
     }
 }
@@ -94,10 +94,10 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     //go wtime N btime N winc N binc N
     let args: Vec<&str> = full_command.split(" ").collect();
     let best_move = match args[1].trim() {
-        "depth" => b.search(args[2].trim().parse().unwrap(), false),
-        "movetime" => b.search(40, true),
-        "nodes" => b.search(40, true),
-        "wtime" => b.search(40, true),
+        "depth" => b.search(args[2].trim().parse().unwrap()),
+        "movetime" => b.search(40),
+        "nodes" => b.search(40),
+        "wtime" => b.search(40),
         _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
     };
     eprintln!("bestmove {}", move_to_uci(&best_move));
