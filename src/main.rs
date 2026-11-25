@@ -16,7 +16,7 @@ pub mod translate_move_uci;
 
 const ENGINE_NAME: &str = "Kira V0.2";
 const AUTHOR_NAME: &str = "Florian Klöckner";
-
+const DEFAULT_TIME_LIMIT: u64 = 950;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut board = setup_board();
@@ -54,10 +54,10 @@ fn main() {
         println!("{res}");
         let zobrist = board::position_key::zobrist_hash(&res);
         println!("zobrist key: {:#x}", zobrist);
-        let best_move = res.search(4);
+        let best_move = res.search(4, DEFAULT_TIME_LIMIT);
         println!("best move is: {}", move_to_uci(&best_move));
     } else if args[1] == "search" {
-        let bestmove = board.search(args[2].parse().expect(""));
+        let bestmove = board.search(args[2].parse().expect(""), DEFAULT_TIME_LIMIT);
         println!("bestmove: {:?}", bestmove);
     }
 }
@@ -94,10 +94,10 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
     //go wtime N btime N winc N binc N
     let args: Vec<&str> = full_command.split(" ").collect();
     let best_move = match args[1].trim() {
-        "depth" => b.search(args[2].trim().parse().unwrap()),
-        "movetime" => b.search(40),
-        "nodes" => b.search(40),
-        "wtime" => b.search(40),
+        "depth" => b.search(args[2].trim().parse().unwrap(), 10000),
+        "movetime" => b.search(40, args[2].trim().parse().unwrap()),
+        "nodes" => b.search(40, 10000), //not implemented, just for resillience
+        "wtime" => b.search(40, 950),   //not much merit from thinking longer than 950 milliseconds
         _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
     };
     eprintln!("bestmove {}", move_to_uci(&best_move));

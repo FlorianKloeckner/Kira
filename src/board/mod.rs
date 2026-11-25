@@ -760,7 +760,7 @@ impl Board {
         score * side_val
     }
 
-    pub fn search(&mut self, depth: usize) -> Move {
+    pub fn search(&mut self, depth: usize, time_limit: u64) -> Move {
         let adaptive_depth = depth;
 
         println!(
@@ -792,7 +792,8 @@ impl Board {
 
             for (j, m) in possible_moves.iter().enumerate() {
                 let undo = self.make_move(m);
-                let result = self.nega_max(current_depth - 1, -beta, -alpha, &mut cntxt);
+                let result =
+                    self.nega_max(current_depth - 1, -beta, -alpha, &mut cntxt, time_limit);
                 let score = match result {
                     Ok(r) => -r,
                     Err(e) => {
@@ -831,10 +832,11 @@ impl Board {
         mut alpha: isize,
         beta: isize,
         context: &mut Context,
+        time_limit: u64,
     ) -> Result<isize, &'static str> {
         if context.nodes & 1024 == 0 {
             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-            if current_time - context.start_time > Duration::from_millis(950) {
+            if current_time - context.start_time > Duration::from_millis(time_limit) {
                 return Err("out of time");
             }
         }
@@ -858,7 +860,7 @@ impl Board {
         for m in possible_moves.iter() {
             context.nodes += 1;
             let undo = self.make_move(m);
-            let score = -self.nega_max(depth - 1, -beta, -alpha, context)?;
+            let score = -self.nega_max(depth - 1, -beta, -alpha, context, time_limit)?;
 
             self.unmake_move(m, undo);
 
