@@ -97,7 +97,7 @@ fn uci_parse_go_string(full_command: &str, b: &mut Board) {
         "depth" => b.search(args[2].trim().parse().unwrap(), 10000),
         "movetime" => b.search(40, args[2].trim().parse().unwrap()),
         "nodes" => b.search(40, 10000), //not implemented, just for resillience
-        "wtime" => b.search(40, 950),   //not much merit from thinking longer than 950 milliseconds
+        "wtime" => b.search(40, 2000),  //not much merit from thinking longer than 950 milliseconds
         _ => panic!("expected one of [depth, movetime, nodes, wtime] after 'go'"),
     };
     eprintln!("bestmove {}", move_to_uci(&best_move));
